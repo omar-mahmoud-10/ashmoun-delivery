@@ -170,7 +170,7 @@ export default function Home() {
           ))}
           <Pressable
             style={[styles.locationRow, isWebPhone && styles.locationRowWebPhone]}
-            onPress={() => router.navigate("/profile")}>
+            onPress={() => router.push("/address-new")}>
               <AppText style={styles.locationLabel}>التوصيل إلى </AppText>
               <AppText style={styles.locationArea}>{address ? address.zoneName : "اختر المنطقة"}</AppText>
             <Ionicons name="chevron-down" size={16} color="#fff" />
