@@ -1,8 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "convex/react";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, router } from "expo-router";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Platform, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api } from "@/convex/_generated/api";
 import { AppText } from "@/components/app-text";
 import { ShopCard } from "@/components/shop-card";
@@ -15,10 +15,13 @@ const webNoOutline: object = Platform.OS === "web" ? { outlineStyle: "none" } : 
 export default function CategoryShops() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const now = useNow();
+  const addresses = useQuery(api.addresses.mine);
   const category = useQuery(api.catalog.category, { categoryId: id });
   const shops = useQuery(api.catalog.shops, { categoryId: id });
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+
+  const address = addresses?.find((a) => a.isDefault) ?? addresses?.[0];
 
   const filteredShops = useMemo(() => {
     if (!shops) return shops;
@@ -38,13 +41,22 @@ export default function CategoryShops() {
       <Stack.Screen
         options={{
           headerShown: true,
-          title: category ? `${category.emoji} ${category.name}` : "",
+          title: address ? `التوصيل إلى ${address.zoneName}` : "اختر المنطقة",
           headerBackTitle: "عودة",
           headerBackButtonDisplayMode: "minimal",
         }}
       />
       <View style={styles.container}>
         <View style={styles.searchWrapper}>
+          <Pressable
+            style={styles.locationRow}
+            onPress={() => router.push("/address-new")}>
+            <AppText variant="caption" style={styles.locationLabel}>التوصيل إلى </AppText>
+            <AppText variant="caption" style={styles.locationArea}>
+              {address ? address.zoneName : "اختر المنطقة"}
+            </AppText>
+            <Ionicons name="chevron-down" size={14} color={colors.ink} />
+          </Pressable>
           <View style={styles.promoRow}>
             <Ionicons name="bicycle-outline" size={18} color={colors.ink} />
             <AppText variant="caption" style={styles.promoText}>
@@ -103,11 +115,19 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     width: "100%",
     backgroundColor: "#FFD8BF",
-    borderRadius: radius.md,
+    borderRadius: 10,
     paddingHorizontal: space.md,
     paddingVertical: 6,
   },
   promoText: { fontWeight: "700" },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    alignSelf: "flex-start",
+  },
+  locationLabel: { color: colors.ink, opacity: 0.7 },
+  locationArea: { color: colors.ink, fontWeight: "800" },
   search: {
     minHeight: 48,
     flexDirection: "row",
