@@ -46,8 +46,8 @@ export default function CategoryShops() {
       <View style={styles.container}>
         <View style={styles.searchWrapper}>
           <View style={styles.promoRow}>
-            <Ionicons name="bicycle-outline" size={18} color={colors.primaryInk} />
-            <AppText variant="caption" tone="primaryInk" style={styles.promoText}>
+            <Ionicons name="bicycle-outline" size={18} color={colors.ink} />
+            <AppText variant="caption" style={styles.promoText}>
               توصيل مجاني لطلبك الأول داخل مركز بركة السبع
             </AppText>
           </View>
