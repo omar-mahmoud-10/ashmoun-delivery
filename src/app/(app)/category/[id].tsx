@@ -45,6 +45,12 @@ export default function CategoryShops() {
       />
       <View style={styles.container}>
         <View style={styles.searchWrapper}>
+          <View style={styles.promoRow}>
+            <Ionicons name="bicycle-outline" size={18} color={colors.primaryInk} />
+            <AppText variant="caption" tone="primaryInk" style={styles.promoText}>
+              توصيل مجاني لطلبك الأول داخل مركز بركة السبع
+            </AppText>
+          </View>
           <View style={[styles.search, searchFocused && styles.searchFocused]}>
             <Ionicons name="search" size={20} color={colors.muted} />
             <TextInput
@@ -88,7 +94,19 @@ const styles = StyleSheet.create({
     paddingTop: space.md,
     paddingBottom: space.sm,
     backgroundColor: colors.background,
+    gap: space.sm,
   },
+  promoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    alignSelf: "flex-start",
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: 6,
+  },
+  promoText: { fontWeight: "700" },
   search: {
     minHeight: 48,
     flexDirection: "row",
