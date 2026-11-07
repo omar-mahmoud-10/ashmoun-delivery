@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: space.xs,
     alignSelf: "flex-start",
-    backgroundColor: colors.primarySoft,
+    backgroundColor: "#FFD8BF",
     borderRadius: radius.pill,
     paddingHorizontal: space.md,
     paddingVertical: 6,
