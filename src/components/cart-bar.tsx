@@ -18,7 +18,6 @@ export function CartBar() {
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1.12, duration: 450, useNativeDriver: true }),
         Animated.timing(pulse, { toValue: 1, duration: 450, useNativeDriver: true }),
-        Animated.delay(1200),
       ]),
     );
     loop.start();
@@ -43,7 +42,7 @@ export function CartBar() {
             params: { subtotal: String(subtotal), count: String(count) },
           })
         }>
-        <Ionicons name="cart-outline" size={24} color="#000" />
+        <Ionicons name="cart-outline" size={30} color="#000" />
         <View style={styles.badge}>
           <AppText style={styles.badgeText}>{count}</AppText>
         </View>
@@ -59,9 +58,9 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   button: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",

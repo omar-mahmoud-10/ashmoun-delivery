@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "convex/react";
-import { Redirect, router, Stack, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { router, Stack, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -10,14 +10,13 @@ import { Button } from "@/components/button";
 import { FormScreen } from "@/components/form-screen";
 import { PriceSummary } from "@/components/price-summary";
 import { TextField } from "@/components/text-field";
-import { cartCount, cartShops, cartSubtotal, useCart } from "@/lib/cart";
-import { errorMessage } from "@/lib/errors";
+import { cartCount, cartShops, cartSubtotal, useCart } from "@/lib/cart";import { errorMessage } from "@/lib/errors";
 import { useLocationPicker, type PickedLocation } from "@/lib/location-picker";
 import { useNow } from "@/lib/use-now";
 import { colors, formatPrice, radius, space } from "@/theme";
 
 export default function Checkout() {
-  const { lines, clear } = useCart();
+  const { lines, clear, setQuantity } = useCart();
   const me = useQuery(api.users.me);
   const addresses = useQuery(api.addresses.mine);
   const place = useMutation(api.orders.place);
@@ -75,6 +74,12 @@ export default function Checkout() {
   const subtotal =
     quote?.kind === "ok" ? quote.shops.reduce((sum, s) => sum + s.subtotal, 0) : cartSubtotal(lines);
 
+  useEffect(() => {
+    if (!placed && lines.length === 0) {
+      router.replace("/");
+    }
+  }, [placed, lines.length]);
+
   async function submit() {
     if (lines.length === 0 || placing) return;
     if (!guest && !address) return;
@@ -110,8 +115,6 @@ export default function Checkout() {
       setPlacing(false);
     }
   }
-
-  if (!placed && lines.length === 0) return <Redirect href="/" />;
 
   const guestReady = !!pickedLoc?.zoneId && !!pickedLoc?.address && phone.trim().length >= 6;
   const deliveryFeePerOrder = guest ? pickedLoc?.deliveryFee : address?.deliveryFee;
@@ -167,7 +170,6 @@ export default function Checkout() {
       <ScrollView keyboardShouldPersistTaps="handled">
         {Number.isFinite(count) || lines.length > 0 ? (
           <Pressable
-            accessibilityRole="button"
             accessibilityState={{ expanded: showItems }}
             onPress={() => setShowItems((v) => !v)}
             style={styles.option}>
@@ -185,29 +187,46 @@ export default function Checkout() {
             </View>
             {showItems ? (
               <View style={styles.itemsList}>
-                {grouped.map((g) => (
-                  <View key={g.shopId} style={styles.shopGroup}>
-                    <AppText variant="subtitle">{g.shopName}</AppText>
-                    {g.items.map((l) => (
-                      <View key={l.key} style={styles.itemRow}>
+                {(grouped ?? []).map((g) => (
+                  <View key={g?.shopId ?? g?.shopName ?? "shop"} style={styles.shopGroup}>
+                    <AppText variant="subtitle">{g?.shopName ?? "محل"}</AppText>
+                    {(g?.items ?? []).map((l) => (
+                      <View key={l?.key ?? l?.name ?? String(Math.random())} style={styles.itemRow}>
                         <View style={styles.itemBody}>
                           <AppText variant="caption" numberOfLines={1}>
-                            {l.quantity}× {l.name}
+                            {l?.quantity ?? 0}× {l?.name ?? ""}
                           </AppText>
-                          {l.optionsLabel ? (
+                          {l?.optionsLabel ? (
                             <AppText variant="caption" tone="muted" numberOfLines={1}>
                               {l.optionsLabel}
                             </AppText>
                           ) : null}
                         </View>
+                        <View style={styles.qtyControls}>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="نقص الكمية"
+                            onPress={() => setQuantity(l?.key ?? "", Math.max(0, (l?.quantity ?? 1) - 1))}
+                            style={styles.qtyButton}>
+                            <AppText style={styles.qtyIcon}>−</AppText>
+                          </Pressable>
+                          <AppText style={styles.qtyText}>{l?.quantity ?? 0}</AppText>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="زد الكمية"
+                            onPress={() => setQuantity(l?.key ?? "", (l?.quantity ?? 0) + 1)}
+                            style={styles.qtyButton}>
+                            <AppText style={styles.qtyIcon}>+</AppText>
+                          </Pressable>
+                        </View>
                         <AppText variant="caption" tone="muted">
-                          {formatPrice(l.unitPrice * l.quantity)}
+                          {formatPrice((l?.unitPrice ?? 0) * (l?.quantity ?? 0))}
                         </AppText>
                       </View>
                     ))}
-                    {shopProblems.get(g.shopId) ? (
+                    {shopProblems.get(g?.shopId ?? "") ? (
                       <AppText variant="caption" tone="danger">
-                        {shopProblems.get(g.shopId)}
+                        {shopProblems.get(g?.shopId ?? "")}
                       </AppText>
                     ) : null}
                   </View>
@@ -356,6 +375,19 @@ const styles = StyleSheet.create({
   shopGroup: { gap: space.xs },
   itemRow: { flexDirection: "row", alignItems: "center", gap: space.md },
   itemBody: { flex: 1, gap: 1 },
+  qtyControls: { flexDirection: "row", alignItems: "center", gap: space.xs },
+  qtyButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qtyIcon: { fontSize: 14, fontWeight: "800", color: colors.ink },
+  qtyText: { fontSize: 14, fontWeight: "700", color: colors.ink, minWidth: 20, textAlign: "center" },
   inputs: { gap: space.sm },
   payment: { paddingTop: space.lg },
 });

@@ -1,5 +1,4 @@
 import { AppText } from "@/components/app-text";
-import { CartBar } from "@/components/cart-bar";
 import { EmojiTile } from "@/components/emoji-tile";
 import { ShopReviews } from "@/components/shop-reviews";
 import { shopState, ShopStatusBadge, todayHoursLabel } from "@/components/shop-status";
@@ -57,6 +56,7 @@ export default function Shop() {
   const [tab, setTab] = useState<TabKey>("menu");
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [addedItem, setAddedItem] = useState<string | null>(null);
 
   const toggleCategory = useCallback((id: string) => {
     setExpanded((prev) => {
@@ -187,9 +187,14 @@ export default function Shop() {
           quantity: 1,
         },
       );
+      setAddedItem(item.name);
+      if (addedTimeout) clearTimeout(addedTimeout);
+      addedTimeout = setTimeout(() => setAddedItem(null), 2000);
     },
     [cart],
   );
+
+  let addedTimeout: ReturnType<typeof setTimeout>;
 
   if (data === undefined) return <ActivityIndicator style={styles.loading} color={colors.primary} />;
   if (data === null) return <Unavailable message="هذا المحل غير متاح حاليًا" />;
@@ -470,9 +475,13 @@ export default function Shop() {
           renderInfo()
         )}
 
+        {addedItem && (
+          <View style={styles.addedToast}>
+            <AppText style={styles.addedToastText}>تم إضافة {addedItem} إلى السلة</AppText>
+          </View>
+        )}
         <View style={styles.bottomSpacer} />
       </ScrollView>
-      <CartBar />
     </>
   );
 }
@@ -602,6 +611,28 @@ const styles = StyleSheet.create({
   empty: { textAlign: "center", paddingVertical: space.lg },
   menuList: { gap: 1 },
   bottomSpacer: { height: space.lg },
+  addedToast: {
+    position: "absolute",
+    bottom: space.lg,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 30,
+  },
+  addedToastText: {
+    backgroundColor: ORANGE,
+    color: "#fff",
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+    fontSize: 14,
+    fontWeight: "700",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 6,
+  },
   infoSection: {
     padding: space.lg,
     backgroundColor: colors.background,

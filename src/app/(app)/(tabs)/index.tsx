@@ -152,7 +152,10 @@ export default function Home() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={[styles.list, Platform.OS === "web" && styles.listWeb]} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[styles.list, Platform.OS === "web" && styles.listWeb]}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={!isWebPhone}>
         {/* Full-bleed orange header with decorative shapes, search, and the wavy bottom edge */}
         <View style={styles.orangeHeader}>
           {HEADER_SHAPES.map((s) => (
