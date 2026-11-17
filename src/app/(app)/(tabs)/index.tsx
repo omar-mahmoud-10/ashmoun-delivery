@@ -177,7 +177,7 @@ color={DARK}
               <AppText style={styles.locationArea}>{address ? address.zoneName : "اختر المنطقة"}</AppText>
             <Ionicons name="chevron-down" size={16} color="#fff" />
           </Pressable>
-          <View style={[styles.search, searchFocused && styles.searchFocused]}>
+          <View style={[styles.search, searchFocused && styles.searchFocused, isWebPhone && styles.searchWebPhone]}>
             <Ionicons name="search" size={20} color="#333" />
             <TextInput
               accessibilityLabel="ابحث عن الطعام"
@@ -395,6 +395,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingHorizontal: space.lg,
   },
+  searchWebPhone: { marginTop: space.md },
   searchFocused: { borderWidth: 2, borderColor: "#141414" },
   searchInput: { flex: 1, minHeight: 46, fontFamily: fonts.medium, fontSize: 15, color: "#000", textAlign: "right" },
   blackFriday: { alignItems: "center", paddingVertical: space.sm },

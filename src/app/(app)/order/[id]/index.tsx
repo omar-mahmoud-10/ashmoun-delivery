@@ -15,11 +15,11 @@ import { orderCode } from "@/lib/order-code";
 import { colors, formatPrice, radius, space } from "@/theme";
 
 const statusHints: Record<OrderStatus, { text: string; color: string }> = {
-  created: { text: "بانتظار تأكيد المحل لطلبك", color: colors.warningInk },
+  created: { text: "بانتظار تأكيد الطلب", color: colors.warningInk },
   confirmed: { text: "يقوم المحل بتجهيز طلبك", color: colors.primaryInk },
   with_driver: { text: "المندوب في الطريق إليك", color: colors.primaryInk },
   delivered: { text: "تم التوصيل، بالهناء والشفاء", color: colors.successInk },
-  returned: { text: "تم إرجاع الطلب إلى المحل", color: colors.dangerInk },
+  returned: { text: "تم إرجاع الطلب", color: colors.dangerInk },
   cancelled: { text: "تم إلغاء الطلب", color: colors.mutedInk },
 };
 
@@ -37,7 +37,7 @@ export default function OrderTracking() {
     if (!order) return;
     const sure = await confirm({
       title: "إلغاء الطلب؟",
-      message: `سيتم إلغاء طلبك من ${order.shopName}.`,
+      message: `سيتم إلغاء الطلب ${orderCode(order._id)}.`,
       confirmLabel: "إلغاء الطلب",
     });
     if (!sure) return;
@@ -56,7 +56,7 @@ export default function OrderTracking() {
     <ScrollView contentContainerStyle={[styles.content, Platform.OS === "web" && styles.contentWeb]}>
       <Stack.Screen options={{ title: `طلب ${orderCode(order._id)}` }} />
       <View style={styles.card}>
-        <AppText variant="title">{order.shopName}</AppText>
+        <AppText variant="title" numberOfLines={2}>{order.shopName}</AppText>
         <AppText variant="subtitle" style={{ color: statusHints[order.status].color }}>
           {statusHints[order.status].text}
         </AppText>
@@ -84,7 +84,6 @@ export default function OrderTracking() {
       ) : null}
 
       <View style={styles.card}>
-        <AppText variant="subtitle">الطلب</AppText>
         {order.items.map((item, index) => (
           <View key={`${item.productId}-${index}`} style={styles.row}>
             <View style={styles.itemBody}>
@@ -100,12 +99,13 @@ export default function OrderTracking() {
             <AppText>{formatPrice(item.unitPrice * item.quantity)}</AppText>
           </View>
         ))}
-        {order.note ? (
-          <AppText variant="caption" tone="muted">
-            ملاحظات: {order.note}
-          </AppText>
-        ) : null}
       </View>
+
+      {order.note ? (
+        <View style={styles.card}>
+          <AppText variant="caption" tone="muted">ملاحظات: {order.note}</AppText>
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <AppText variant="caption" tone="muted">
@@ -122,7 +122,8 @@ export default function OrderTracking() {
 
       <PriceSummary subtotal={order.subtotal} deliveryFee={order.deliveryFee} />
 
-      {canCustomerCancel(order.status) ? (
+      {/* Guests have no account to attach a cancellation to; contact support instead. */}
+      {order.userId && canCustomerCancel(order.status) ? (
         <Button kind="danger" label="إلغاء الطلب" loading={cancelling} onPress={onCancel} />
       ) : null}
       {error ? <AppText tone="danger">{error}</AppText> : null}

@@ -23,7 +23,7 @@ export default function OrderSuccess() {
       </View>
       <AppText variant="display">تم إرسال طلبك بنجاح</AppText>
       <AppText tone="muted" style={styles.center}>
-        {order ? `وصل طلبك من ${order.shopName} إلى المحل، وسيتم تأكيده في أقرب وقت.` : "..."}
+        {order ? `تم استلام طلبك من ${order.shopName ?? ""}، وسيتم تأكيده في أقرب وقت.` : "..."}
       </AppText>
       {order ? (
         <View style={styles.card}>

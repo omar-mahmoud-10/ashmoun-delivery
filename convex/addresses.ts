@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { pointInPolygon } from "./lib/geo";
 import { geoPoint } from "./schema";
 import { requireUser } from "./lib/session";
 

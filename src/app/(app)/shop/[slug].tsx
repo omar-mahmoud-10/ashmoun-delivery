@@ -1,5 +1,5 @@
 import { AppText } from "@/components/app-text";
-import { CART_BAR_SPACE, CartBar } from "@/components/cart-bar";
+import { CartBar } from "@/components/cart-bar";
 import { EmojiTile } from "@/components/emoji-tile";
 import { ShopReviews } from "@/components/shop-reviews";
 import { shopState, ShopStatusBadge, todayHoursLabel } from "@/components/shop-status";
@@ -8,7 +8,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useCart } from "@/lib/cart";
 import { useNow } from "@/lib/use-now";
-import { colors, fonts, formatPrice, radius, space } from "@/theme";
+import { colors, fonts, radius, space } from "@/theme";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAction, useMutation, useQuery } from "convex/react";
 import * as ImagePicker from "expo-image-picker";
@@ -198,14 +198,7 @@ export default function Shop() {
   const state = shopState(shop, now);
   const isPharmacy = data.category?.slug === "pharmacies";
 
-  const currentPrice = (price: number, discountPercent?: number) => {
-    const discount = discountPercent ?? 0;
-    return discount > 0 ? price * (1 - discount / 100) : price;
-  };
-
   const renderProductRow = (item: Product) => {
-    const discount = item.discountPercent ?? 0;
-    const price = currentPrice(item.price, discount);
     const hasRequired = item.optionGroups.some((g) => g.min > 0);
 
     return (
@@ -238,23 +231,8 @@ export default function Shop() {
             </AppText>
           ) : null}
         </View>
-        {/* Left section – price and add to cart */}
+        {/* Left section – add to cart */}
         <View style={styles.priceColumn}>
-          <AppText variant="caption" tone="muted" style={styles.currency}>
-            EGP
-          </AppText>
-          <AppText variant="subtitle" tone="ink" style={[styles.price, { fontFamily: fonts.bold }]}>
-            {formatPrice(price)}
-          </AppText>
-          {discount > 0 ? (
-            <AppText
-              variant="caption"
-              tone="muted"
-              style={[styles.originalPrice, { textDecorationLine: "line-through" }]}
-            >
-              {formatPrice(item.price)}
-            </AppText>
-          ) : null}
           <Pressable
             style={styles.addButton}
             accessibilityRole="button"
@@ -494,7 +472,7 @@ export default function Shop() {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
-      <CartBar overSafeArea />
+      <CartBar />
     </>
   );
 }
@@ -502,7 +480,7 @@ export default function Shop() {
 const styles = StyleSheet.create({
   loading: { marginTop: space.xxl },
   container: { flex: 1, backgroundColor: colors.background },
-  contentContainer: { paddingBottom: CART_BAR_SPACE + space.lg },
+  contentContainer: { paddingBottom: space.lg },
   shopHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -609,9 +587,6 @@ const styles = StyleSheet.create({
   name: { fontSize: 15, fontFamily: fonts.bold, color: colors.ink },
   desc: { fontSize: 13, color: colors.muted, marginTop: 2 },
   priceColumn: { alignItems: "center", marginRight: space.sm },
-  currency: { fontSize: 11, color: colors.muted },
-  price: { fontSize: 15, fontFamily: fonts.bold, color: colors.ink },
-  originalPrice: { fontSize: 12, color: colors.muted },
   addButton: {
     width: 34,
     height: 34,
@@ -626,7 +601,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: "#F0F0F0", marginHorizontal: space.lg },
   empty: { textAlign: "center", paddingVertical: space.lg },
   menuList: { gap: 1 },
-  bottomSpacer: { height: CART_BAR_SPACE + space.lg },
+  bottomSpacer: { height: space.lg },
   infoSection: {
     padding: space.lg,
     backgroundColor: colors.background,

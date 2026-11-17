@@ -39,7 +39,7 @@ export default function Profile() {
       {me === null ? (
         <View style={styles.card}>
           <AppText variant="title">مرحبًا بك 👋</AppText>
-          <AppText tone="muted">يمكنك تصفح المحلات والقوائم، وسجّل الدخول للطلب.</AppText>
+          <AppText tone="muted">يمكنك الطلب كزائر، وسجّل الدخول لحفظ عناوينك ومتابعة طلباتك.</AppText>
           <View style={styles.actions}>
             <Link href="/sign-in" asChild>
               <Button kind="primary" label="تسجيل الدخول" style={styles.grow} />
@@ -58,7 +58,7 @@ export default function Profile() {
 
       <View style={styles.sectionRow}>
         <AppText variant="subtitle">عناويني</AppText>
-        <Pressable accessibilityRole="button" onPress={() => router.push("/address-new")} hitSlop={8} style={styles.link}>
+        <Pressable accessibilityRole="button" onPress={() => router.push("/select-location")} hitSlop={8} style={styles.link}>
           <AppText variant="caption" tone="primaryInk">
             + أضف عنوان
           </AppText>

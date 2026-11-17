@@ -33,9 +33,10 @@ async function setup() {
   await t.mutation(internal.admin.promote, { phone: "+20 111 234 5678" });
   const asCustomer = t.withIdentity({ subject: `${ids.customerId}|s` });
   const asAdmin = t.withIdentity({ subject: `${ids.adminId}|s` });
-  const orderId = await asCustomer.mutation(api.orders.place, {
-    shopId: ids.market, addressId: ids.addressId, note: "", items: [{ productId: ids.milk, quantity: 1, selections: [] }],
+  const res = await asCustomer.mutation(api.orders.place, {
+    addressId: ids.addressId, note: "", items: [{ productId: ids.milk, quantity: 1, selections: [] }],
   });
+  const orderId = res.orderIds[0];
   return { t, asCustomer, asAdmin, orderId, ...ids };
 }
 

@@ -1,6 +1,19 @@
 import { create } from "zustand";
+import type { Id } from "@/convex/_generated/dataModel";
 
-export type PickedLocation = { lat: number; lng: number };
+export type PickedLocation = {
+  lat?: number;
+  lng?: number;
+  address?: string;
+  zoneId?: Id<"zones">;
+  zoneName?: string;
+  deliveryFee?: number;
+  subtotal?: number;
+  total?: number;
+  // When the pick was confirmed; the choice hub pops itself back to the
+  // caller only for picks made after it opened (ignores stale picks).
+  at?: number;
+};
 
 type State = {
   picked: PickedLocation | null;

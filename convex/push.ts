@@ -7,10 +7,11 @@ export const orderRecipient = internalQuery({
   args: { orderId: v.id("orders") },
   handler: async (ctx, { orderId }) => {
     const order = await ctx.db.get(orderId);
-    if (order === null) return null;
+    if (order === null || order.userId === undefined) return null;
+    const userId = order.userId;
     const tokens = await ctx.db
       .query("pushTokens")
-      .withIndex("by_user", (q) => q.eq("userId", order.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
     return { tokens: tokens.map((t) => t.token), shopName: order.shopName };
   },

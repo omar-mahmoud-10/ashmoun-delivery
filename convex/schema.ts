@@ -57,6 +57,7 @@ export default defineSchema({
     deliveryFee: v.number(),
     active: v.boolean(),
     sortOrder: v.number(),
+    polygon: v.optional(v.array(geoPoint)),
   }).index("by_sort", ["sortOrder"]),
 
   addresses: defineTable({
@@ -137,7 +138,8 @@ export default defineSchema({
   }),
 
   orders: defineTable({
-    userId: v.id("users"),
+    // Guest checkout: visitors can order without an account, so userId is optional.
+    userId: v.optional(v.id("users")),
     shopId: v.id("shops"),
     shopName: v.string(),
     address: v.object({
@@ -165,7 +167,7 @@ export default defineSchema({
     payment: v.literal("cod"),
     status: orderStatus,
     history: v.array(
-      v.object({ status: orderStatus, at: v.number(), by: v.id("users") }),
+      v.object({ status: orderStatus, at: v.number(), by: v.optional(v.id("users")) }),
     ),
     driver: v.optional(v.object({ name: v.string(), phone: v.string() })),
   })

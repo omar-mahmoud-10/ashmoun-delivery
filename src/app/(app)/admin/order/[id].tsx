@@ -54,7 +54,7 @@ export default function AdminOrder() {
     if (status === "cancelled" || status === "returned") {
       const sure = await confirm({
         title: `${statusLabels[status]}؟`,
-        message: `الطلب ${orderCode(order._id)} من ${order.shopName}.`,
+        message: `الطلب ${orderCode(order._id)}${order.shopName ? ` من ${order.shopName}` : ""}.`,
         confirmLabel: actionLabels[status],
       });
       if (!sure) return;

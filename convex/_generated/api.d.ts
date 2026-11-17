@@ -16,6 +16,7 @@ import type * as bootstrapAdmin from "../bootstrapAdmin.js";
 import type * as catalog from "../catalog.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
+import type * as lib_geo from "../lib/geo.js";
 import type * as lib_hours from "../lib/hours.js";
 import type * as lib_orderStatus from "../lib/orderStatus.js";
 import type * as lib_phone from "../lib/phone.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   catalog: typeof catalog;
   crons: typeof crons;
   http: typeof http;
+  "lib/geo": typeof lib_geo;
   "lib/hours": typeof lib_hours;
   "lib/orderStatus": typeof lib_orderStatus;
   "lib/phone": typeof lib_phone;

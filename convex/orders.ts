@@ -1,11 +1,12 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v, type Infer } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { isShopOpen } from "./lib/hours";
 import { canCustomerCancel } from "./lib/orderStatus";
 import { MAX_QUANTITY, priceLine } from "./lib/pricing";
-import { requireUser } from "./lib/session";import { cartSelection } from "./schema";
+import { requireUser } from "./lib/session";
+import { cartSelection, geoPoint } from "./schema";
 
 const MAX_LINES = 30;
 const MAX_NOTE = 300;
@@ -18,10 +19,11 @@ const cartItems = v.array(
   }),
 );
 
-// The one place cart lines are priced, shared by the live quote and by place().
-async function priceCart(ctx: QueryCtx, shop: Doc<"shops">, lines: Infer<typeof cartItems>) {
+type CartItem = Infer<typeof cartItems>[number];
+
+// Price and validate one shop's cart lines.
+async function priceShopCart(ctx: QueryCtx, shop: Doc<"shops">, lines: CartItem[]) {
   if (lines.length === 0) throw new ConvexError("السلة فارغة");
-  if (lines.length > MAX_LINES) throw new ConvexError("الطلب كبير، يرجى تقسيمه إلى أكثر من طلب");
   const items = [];
   for (const line of lines) {
     if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > MAX_QUANTITY) {
@@ -29,7 +31,7 @@ async function priceCart(ctx: QueryCtx, shop: Doc<"shops">, lines: Infer<typeof 
     }
     const product = await ctx.db.get(line.productId);
     if (product === null) throw new ConvexError("يوجد منتج في السلة أُزيل من القائمة، يرجى إزالته والمتابعة");
-    if (product.shopId !== shop._id) throw new ConvexError("يجب أن يكون الطلب من محل واحد فقط");
+    if (product.shopId !== shop._id) throw new ConvexError("يوجد منتج لا ينتمي لهذا المحل");
     if (!product.available) throw new ConvexError(`${product.name} غير متاح حاليًا`);
     const priced = priceLine(product, line.selections);
     if (priced.kind === "invalid") throw new ConvexError(`تغيّرت اختيارات ${product.name}، يرجى إزالته وإضافته مرة أخرى`);
@@ -46,93 +48,140 @@ async function priceCart(ctx: QueryCtx, shop: Doc<"shops">, lines: Infer<typeof 
 }
 
 export const quote = query({
-  args: { shopId: v.id("shops"), items: cartItems },
+  args: { items: cartItems },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (userId === null) {
-      // Guests browse freely; the cart just can't be checked out before signing in.
-      return { kind: "invalid" as const, message: "سجّل الدخول أولًا لإتمام الطلب" };
+    if (args.items.length === 0) return { kind: "invalid" as const, message: "السلة فارغة" };
+    if (args.items.length > MAX_LINES) return { kind: "invalid" as const, message: "الطلب كبير، يرجى تقسيمه" };
+    // Group lines by shop.
+    const byShop = new Map<Id<"shops">, CartItem[]>();
+    for (const line of args.items) {
+      const product = await ctx.db.get(line.productId);
+      if (product === null) return { kind: "invalid" as const, message: "يوجد منتج في السلة أُزيل من القائمة" };
+      const arr = byShop.get(product.shopId) ?? [];
+      arr.push(line);
+      byShop.set(product.shopId, arr);
     }
-    const shop = await ctx.db.get(args.shopId);
-    if (shop === null) return { kind: "invalid" as const, message: "هذا المحل غير متاح حاليًا" };
-    try {
-      const { items, subtotal } = await priceCart(ctx, shop, args.items);
-      return {
-        kind: "ok" as const,
-        unitPrices: items.map((i) => i.unitPrice),
-        subtotal,
-        minOrder: shop.minOrder,
-        // The client decides open/closed from these so the answer follows the clock.
-        hours: shop.hours,
-        paused: shop.paused,
-      };
-    } catch (error) {
-      if (error instanceof ConvexError && typeof error.data === "string") {
-        return { kind: "invalid" as const, message: error.data };
+    const shops = [];
+    for (const [shopId, lines] of byShop) {
+      const shop = await ctx.db.get(shopId);
+      if (shop === null) return { kind: "invalid" as const, message: "أحد المحلات غير متاح حاليًا" };
+      try {
+        const { subtotal } = await priceShopCart(ctx, shop, lines);
+        shops.push({ shopId, shopName: shop.name, subtotal, minOrder: shop.minOrder, hours: shop.hours, paused: shop.paused });
+      } catch (error) {
+        if (error instanceof ConvexError && typeof error.data === "string") {
+          return { kind: "invalid" as const, message: error.data };
+        }
+        throw error;
       }
-      throw error;
     }
+    return { kind: "ok" as const, shops };
   },
 });
 
 export const place = mutation({
   args: {
-    shopId: v.id("shops"),
-    addressId: v.id("addresses"),
+    // Logged-in customers order to a saved address; guests order to a picked
+    // location with a typed street, a chosen zone, and contact info.
+    addressId: v.optional(v.id("addresses")),
+    zoneId: v.optional(v.id("zones")),
+    street: v.optional(v.string()),
+    landmark: v.optional(v.string()),
+    location: v.optional(geoPoint),
+    customerName: v.optional(v.string()),
+    customerPhone: v.optional(v.string()),
     note: v.string(),
     items: cartItems,
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const address = await ctx.db.get(args.addressId);
-    if (address === null || address.userId !== user._id) throw new ConvexError("العنوان غير موجود");
-    const zone = await ctx.db.get(address.zoneId);
+    const userId = await getAuthUserId(ctx);
+    const user = userId === null ? null : await ctx.db.get(userId);
+
+    let zone, label, street, landmark, location;
+    if (user) {
+      if (!args.addressId) throw new ConvexError("العنوان غير موجود");
+      const address = await ctx.db.get(args.addressId);
+      if (address === null || address.userId !== user._id) throw new ConvexError("العنوان غير موجود");
+      zone = await ctx.db.get(address.zoneId);
+      label = address.label;
+      street = address.street;
+      landmark = address.landmark;
+      location = address.location;
+    } else {
+      if (!args.zoneId) throw new ConvexError("يرجى اختيار منطقة التوصيل");
+      zone = await ctx.db.get(args.zoneId);
+      street = (args.street ?? "").trim();
+      if (street.length < 1) throw new ConvexError("يرجى كتابة العنوان");
+    }
     if (zone === null || !zone.active) throw new ConvexError("التوصيل متوقف في هذه المنطقة حاليًا");
 
-    const shop = await ctx.db.get(args.shopId);
-    if (shop === null) throw new ConvexError("المحل غير موجود");
-    const now = Date.now();
-    if (shop.paused) throw new ConvexError("المحل متوقف عن استقبال الطلبات مؤقتًا");
-    if (!isShopOpen(shop, now)) throw new ConvexError("المحل مغلق حاليًا");
+    const customerName = (args.customerName ?? user?.name ?? "").trim();
+    const customerPhone = (args.customerPhone ?? user?.phone ?? "").trim();
+    if (customerPhone.length < 6) throw new ConvexError("يرجى إدخال رقم جوال صحيح");
 
+    if (args.items.length === 0) throw new ConvexError("السلة فارغة");
+    if (args.items.length > MAX_LINES) throw new ConvexError("الطلب كبير، يرجى تقسيمه إلى أكثر من طلب");
     const note = args.note.trim();
     if (note.length > MAX_NOTE) throw new ConvexError(`يجب أن تكون الملاحظات أقل من ${MAX_NOTE} حرفًا`);
 
-    const { items, subtotal } = await priceCart(ctx, shop, args.items);
-    if (subtotal < (shop.minOrder ?? 0)) throw new ConvexError(`الحد الأدنى للطلب من ${shop.name} هو ${shop.minOrder ?? 0} ج.م`);
+    // Group items by shop and create one order per shop.
+    const byShop = new Map<Id<"shops">, CartItem[]>();
+    for (const line of args.items) {
+      const product = await ctx.db.get(line.productId);
+      if (product === null) throw new ConvexError("يوجد منتج في السلة أُزيل من القائمة، يرجى إزالته والمتابعة");
+      const arr = byShop.get(product.shopId) ?? [];
+      arr.push(line);
+      byShop.set(product.shopId, arr);
+    }
 
-    return await ctx.db.insert("orders", {
-      userId: user._id,
-      shopId: shop._id,
-      shopName: shop.name,
-      address: {
-        zoneName: zone.name,
-        label: address.label,
-        street: address.street,
-        landmark: address.landmark,
-        location: address.location,
-      },
-      customerName: user.name ?? "",
-      customerPhone: user.phone ?? "",
-      items,
-      note,
-      subtotal,
-      deliveryFee: zone.deliveryFee,
-      total: subtotal + zone.deliveryFee,
-      payment: "cod",
-      status: "created",
-      history: [{ status: "created", at: now, by: user._id }],
-    });
+    const now = Date.now();
+    const orderIds = [];
+    for (const [shopId, lines] of byShop) {
+      const shop = await ctx.db.get(shopId);
+      if (shop === null) throw new ConvexError("أحد المحلات غير موجود");
+      if (shop.paused) throw new ConvexError(`${shop.name}: المحل متوقف عن استقبال الطلبات مؤقتًا`);
+      if (!isShopOpen(shop, now)) throw new ConvexError(`${shop.name}: المحل مغلق حاليًا`);
+      const { items, subtotal } = await priceShopCart(ctx, shop, lines);
+      if (subtotal < (shop.minOrder ?? 0)) throw new ConvexError(`الحد الأدنى للطلب من ${shop.name} هو ${shop.minOrder ?? 0} ج.م`);
+      const orderId = await ctx.db.insert("orders", {
+        userId: user?._id,
+        shopId: shop._id,
+        shopName: shop.name,
+        address: {
+          zoneName: zone.name,
+          label: label ?? "موقع الطلب",
+          street,
+          landmark: landmark ?? (args.landmark ?? "").trim(),
+          location: user ? location : args.location,
+        },
+        customerName,
+        customerPhone,
+        items,
+        note,
+        subtotal,
+        deliveryFee: zone.deliveryFee,
+        total: subtotal + zone.deliveryFee,
+        payment: "cod",
+        status: "created",
+        history: [{ status: "created", at: now, by: user?._id }],
+      });
+      orderIds.push(orderId);
+    }
+    return { orderIds };
   },
 });
 
 export const get = query({
   args: { orderId: v.string() },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
+    const userId = await getAuthUserId(ctx);
     const orderId = ctx.db.normalizeId("orders", args.orderId);
     const order = orderId === null ? null : await ctx.db.get(orderId);
-    if (order === null || order.userId !== user._id) return null;
+    if (order === null) return null;
+    // Owner reads their order; guest orders (no userId) are viewable by anyone
+    // who has the id — ids are unguessable, and the guest has no account to
+    // look the order up by.
+    if (order.userId !== undefined && order.userId !== userId) return null;
     return order;
   },
 });

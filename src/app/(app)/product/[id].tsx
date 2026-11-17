@@ -13,7 +13,6 @@ import { StepButton } from "@/components/step-button";
 import { todayHoursLabel } from "@/components/shop-status";
 import { Unavailable } from "@/components/unavailable";
 import { useCart } from "@/lib/cart";
-import { confirm } from "@/lib/confirm";
 import { useNow } from "@/lib/use-now";
 import { colors, formatPrice, radius, space } from "@/theme";
 
@@ -52,18 +51,9 @@ export default function Product() {
     });
   }
 
-  async function addToCart() {
+  function addToCart() {
     if (priced.kind !== "ok") return;
-    const cart = useCart.getState();
-    if (cart.shop && cart.shop.id !== shop._id) {
-      const replace = await confirm({
-        title: "بدء سلة جديدة؟",
-        message: `تحتوي السلة على طلب من ${cart.shop.name}. لا يمكن الطلب من أكثر من محل في الطلب الواحد؛ المتابعة ستؤدي إلى إفراغ السلة.`,
-        confirmLabel: "بدء سلة جديدة",
-      });
-      if (!replace) return;
-    }
-    cart.add(
+    useCart.getState().add(
       { id: shop._id, name: shop.name },
       {
         productId: product._id,
@@ -85,41 +75,29 @@ export default function Product() {
           <EmojiTile emoji={product.emoji} tint={shop.tint} size={96} />
           <AppText variant="display">{product.name}</AppText>
           {product.description ? <AppText tone="muted">{product.description}</AppText> : null}
-          <AppText variant="title" tone="primary">
-            {formatPrice(product.price)}
-          </AppText>
         </View>
 
-        {product.optionGroups.map((group) => (
-          <View key={group.key} style={styles.group}>
-            <View style={styles.groupHeader}>
-              <AppText variant="subtitle">{group.name}</AppText>
-              <AppText variant="caption" tone={group.min > 0 ? "primary" : "muted"}>
-                {groupHint(group)}
-              </AppText>
-            </View>
-            {group.options.map((option) => {
-              const isOn = (selected[group.key] ?? []).includes(option.key);
-              return (
-                <Pressable
-                  key={option.key}
-                  accessibilityRole={group.max === 1 ? "radio" : "checkbox"}
-                  accessibilityState={{ checked: isOn }}
-                  onPress={() => toggle(group, option.key)}
-                  style={[styles.option, isOn && styles.optionOn]}>
-                  <View style={[styles.mark, group.max === 1 && styles.markRound, isOn && styles.markOn]} />
-                  <AppText style={styles.optionName}>{option.name}</AppText>
-                  {option.priceDelta !== 0 ? (
+{product.optionGroups.map((group) => (
+            <View key={group.key} style={styles.group}>
+              {group.options.map((option) => {
+                const isOn = (selected[group.key] ?? []).includes(option.key);
+                return (
+                  <Pressable
+                    key={option.key}
+                    accessibilityRole={group.max === 1 ? "radio" : "checkbox"}
+                    accessibilityState={{ checked: isOn }}
+                    onPress={() => toggle(group, option.key)}
+                    style={[styles.option, isOn && styles.optionOn]}>
+                    <View style={[styles.mark, group.max === 1 && styles.markRound, isOn && styles.markOn]} />
+                    <AppText style={styles.optionName}>{option.name}</AppText>
                     <AppText variant="caption" tone="muted">
-                      {option.priceDelta > 0 ? "+" : ""}
-                      {formatPrice(option.priceDelta)}
+                      {formatPrice(product.price + option.priceDelta)}
                     </AppText>
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </View>
-        ))}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
 
       </ScrollView>
       {shopOpen ? (
@@ -165,12 +143,6 @@ export default function Product() {
   );
 }
 
-function groupHint({ min, max }: { min: number; max: number }) {
-  if (min === 0) return `اختياري · حتى ${max}`;
-  if (min === max) return min === 1 ? "مطلوب" : `مطلوب · اختر ${min}`;
-  return `مطلوب · من ${min} إلى ${max}`;
-}
-
 const styles = StyleSheet.create({
   loading: { marginTop: space.xxl },
   screen: { flex: 1 },
@@ -200,7 +172,6 @@ const styles = StyleSheet.create({
   contentWeb: { paddingTop: space.lg, paddingBottom: space.lg, gap: space.lg },
   header: { gap: space.sm, alignItems: "flex-start" },
   group: { gap: space.sm },
-  groupHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   option: {
     flexDirection: "row",
     alignItems: "center",

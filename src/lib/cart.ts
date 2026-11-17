@@ -12,6 +12,8 @@ export type CartSelection = { groupKey: string; optionKeys: string[] };
 export type CartLine = {
   key: string;
   productId: Id<"products">;
+  shopId: Id<"shops">;
+  shopName: string;
   name: string;
   emoji: string;
   optionsLabel: string;
@@ -23,11 +25,11 @@ export type CartLine = {
 type CartShop = { id: Id<"shops">; name: string };
 
 type CartState = {
-  shop: CartShop | null;
   lines: CartLine[];
-  add: (shop: CartShop, line: Omit<CartLine, "key">) => void;
+  add: (shop: CartShop, line: Omit<CartLine, "key" | "shopId" | "shopName">) => void;
   setQuantity: (key: string, quantity: number) => void;
   clear: () => void;
+  clearShop: (shopId: Id<"shops">) => void;
 };
 
 function lineKey(productId: string, selections: CartSelection[]) {
@@ -41,29 +43,28 @@ function lineKey(productId: string, selections: CartSelection[]) {
 export const useCart = create<CartState>()(
   persist(
     (set) => ({
-      shop: null,
       lines: [],
       add: (shop, line) =>
         set((state) => {
-          const lines = state.shop?.id === shop.id ? state.lines : [];
           const key = lineKey(line.productId, line.selections);
-          const existing = lines.find((l) => l.key === key);
+          const existing = state.lines.find((l) => l.key === key);
           return {
-            shop,
             lines: existing
-              ? lines.map((l) => (l.key === key ? { ...l, quantity: Math.min(MAX_QUANTITY, l.quantity + line.quantity) } : l))
-              : [...lines, { ...line, key }],
+              ? state.lines.map((l) =>
+                  l.key === key ? { ...l, quantity: Math.min(MAX_QUANTITY, l.quantity + line.quantity) } : l,
+                )
+              : [...state.lines, { ...line, shopId: shop.id, shopName: shop.name, key }],
           };
         }),
       setQuantity: (key, quantity) =>
-        set((state) => {
-          const lines =
+        set((state) => ({
+          lines:
             quantity <= 0
               ? state.lines.filter((l) => l.key !== key)
-              : state.lines.map((l) => (l.key === key ? { ...l, quantity: Math.min(MAX_QUANTITY, quantity) } : l));
-          return lines.length === 0 ? { shop: null, lines } : { lines };
-        }),
-      clear: () => set({ shop: null, lines: [] }),
+              : state.lines.map((l) => (l.key === key ? { ...l, quantity: Math.min(MAX_QUANTITY, quantity) } : l)),
+        })),
+      clear: () => set({ lines: [] }),
+      clearShop: (shopId) => set((state) => ({ lines: state.lines.filter((l) => l.shopId !== shopId) })),
     }),
     { name: "cart", storage: createJSONStorage(() => AsyncStorage) },
   ),
@@ -73,30 +74,15 @@ export function cartSubtotal(lines: CartLine[]) {
   return lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
 }
 
-// Saved unit prices can go stale; the cart and checkout show the server's current prices.
-export function useCartQuote() {
-  const shop = useCart((s) => s.shop);
-  const lines = useCart((s) => s.lines);
-  return useQuery(
-    api.orders.quote,
-    shop && lines.length > 0
-      ? {
-          shopId: shop.id,
-          items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity, selections: l.selections })),
-        }
-      : "skip",
-  );
+export function cartShops(lines: CartLine[]) {
+  const seen = new Map<string, CartShop>();
+  for (const line of lines) {
+    if (!seen.has(line.shopId)) seen.set(line.shopId, { id: line.shopId, name: line.shopName });
+  }
+  return [...seen.values()];
 }
 
 export function cartCount(lines: CartLine[]) {
   return lines.reduce((sum, l) => sum + l.quantity, 0);
 }
 
-// Why the cart can't be ordered right now, or null when it can.
-export function cartProblem(quote: ReturnType<typeof useCartQuote>, now: number) {
-  if (quote === undefined) return null;
-  if (quote.kind === "invalid") return quote.message;
-  if (quote.paused) return "المحل متوقف عن استقبال الطلبات مؤقتًا، يرجى المحاولة لاحقًا";
-  if (!isOpenAt(quote.hours, now)) return "المحل مغلق حاليًا، يمكنك الطلب عند فتحه";
-  return null;
-}

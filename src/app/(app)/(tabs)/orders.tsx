@@ -42,7 +42,7 @@ export default function Orders() {
             onPress={() => router.push({ pathname: "/order/[id]", params: { id: item._id } })}
             style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
             <View style={styles.row}>
-              <AppText variant="subtitle">{item.shopName}</AppText>
+              <AppText variant="subtitle" numberOfLines={1}>{item.shopName}</AppText>
               <StatusPill status={item.status} />
             </View>
             <AppText variant="caption" tone="muted" numberOfLines={1}>
