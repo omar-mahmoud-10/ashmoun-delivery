@@ -58,7 +58,11 @@ export default function Profile() {
 
       <View style={styles.sectionRow}>
         <AppText variant="subtitle">عناويني</AppText>
-        <Pressable accessibilityRole="button" onPress={() => router.push("/select-location")} hitSlop={8} style={styles.link}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push({ pathname: "/select-location", params: { from: "/profile" } })}
+          hitSlop={8}
+          style={styles.link}>
           <AppText variant="caption" tone="primaryInk">
             + أضف عنوان
           </AppText>

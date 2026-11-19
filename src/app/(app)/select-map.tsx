@@ -1,4 +1,4 @@
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import * as ExpoLocation from "expo-location";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "convex/react";
@@ -20,16 +20,23 @@ import { Button } from "@/components/button";
 import { LocationMap, type MapCenter } from "@/components/location-map";
 import { findZoneForPoint } from "@/lib/geo";
 import { useLocationPicker } from "@/lib/location-picker";
+import { returnToOrigin } from "@/lib/navigation";
 import { MIN_SEARCH_LENGTH, searchPlaces, type PlaceResult } from "@/lib/place-search";
 import { colors, fonts, radius, space } from "@/theme";
 
 const FALLBACK: MapCenter = { lat: 30.635, lng: 31.083 };
 
-// Map-only page: pin chosen here, confirmed on type-address.
+// Map-only page: the pin is chosen here and confirming it saves the location
+// and returns straight to the page that opened the flow.
 // Point-in-polygon validates the pin against delivery zone polygons.
 export default function SelectMap() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ lat?: string; lng?: string; address?: string; direct?: string }>();
+  const params = useLocalSearchParams<{
+    lat?: string;
+    lng?: string;
+    address?: string;
+    from?: string;
+  }>();
   const zones = useQuery(api.zones.list);
   const setPicked = useLocationPicker((s) => s.setPicked);
   const initialLat = params.lat ? Number(params.lat) : NaN;
@@ -54,7 +61,10 @@ export default function SelectMap() {
   const searchSeq = useRef(0);
 
   const matchedZone = mapSelected && zones ? findZoneForPoint(center, zones) : undefined;
-  const canContinue = mapSelected && !!matchedZone;
+  // The spot is only usable once it has an address to save — the map flow never
+  // asks the customer to type one.
+  const hasAddress = Boolean(placeLabel ?? params.address);
+  const canContinue = mapSelected && !!matchedZone && hasAddress;
 
   useEffect(() => {
     if (hasInitial) return;
@@ -88,9 +98,11 @@ export default function SelectMap() {
 
   function lookupPlace(next: MapCenter) {
     if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
+    // Mark the name as pending right away so the confirm button stays off until
+    // the label for this spot is known.
+    setGeocoding(true);
     geocodeTimer.current = setTimeout(() => {
       const id = ++seq.current;
-      setGeocoding(true);
       void reverseGeocode(next.lat, next.lng)
         .then((label) => {
           if (seq.current !== id) return;
@@ -108,6 +120,9 @@ export default function SelectMap() {
 
   function pickMap(next: MapCenter) {
     resetSuggestions();
+    // The old label belongs to the old spot; drop it until the lookup returns so
+    // a fast confirm cannot save the previous address with the new coordinates.
+    setPlaceLabel(null);
     setCenter(next);
     setMapSelected(true);
     lookupPlace(next);
@@ -228,38 +243,33 @@ export default function SelectMap() {
     }
   }
 
+  // Confirming on the map finishes the pick right away: the page that started
+  // the flow (home, checkout, ...) gets the location back, skipping the hub.
   function confirm() {
     if (!canContinue || !matchedZone) return;
-    if (params.direct === "1") {
-      setPicked({
-        lat: center.lat,
-        lng: center.lng,
-        ...(placeLabel || params.address ? { address: placeLabel ?? params.address } : {}),
-        zoneId: matchedZone._id,
-        zoneName: matchedZone.name,
-        deliveryFee: matchedZone.deliveryFee,
-        at: Date.now(),
-      });
-      router.back();
-      return;
-    }
-    router.replace({
-      pathname: "/type-address",
-      params: {
-        lat: String(center.lat),
-        lng: String(center.lng),
-        ...(placeLabel || params.address ? { address: placeLabel ?? params.address! } : {}),
-      },
+    const address = placeLabel ?? params.address;
+    if (!address) return;
+    setPicked({
+      lat: center.lat,
+      lng: center.lng,
+      address,
+      zoneId: matchedZone._id,
+      zoneName: matchedZone.name,
+      deliveryFee: matchedZone.deliveryFee,
+      at: Date.now(),
     });
+    returnToOrigin(params.from);
   }
 
   const statusText = !mapSelected
     ? "حرّك الخريطة لتحديد الموقع"
     : geocoding
       ? "جارٍ تحديد اسم العنوان..."
-      : matchedZone
-        ? `داخل منطقة التوصيل: ${matchedZone.name} ✓`
-        : "الموقع خارج مناطق التوصيل المتاحة";
+      : !hasAddress
+        ? "تعذر قراءة عنوان هذا الموقع، جرّب نقطة أخرى"
+        : matchedZone
+          ? `داخل منطقة التوصيل: ${matchedZone.name} ✓`
+          : "الموقع خارج مناطق التوصيل المتاحة";
 
   return (
     <View style={styles.screen}>
@@ -324,16 +334,9 @@ export default function SelectMap() {
                     pressed && styles.resultRowPressed,
                   ]}>
                   <Ionicons name="location-outline" size={18} color={colors.primary} />
-                  <View style={styles.resultText}>
-                    <AppText variant="body" numberOfLines={1}>
-                      {place.primary}
-                    </AppText>
-                    {place.secondary ? (
-                      <AppText variant="caption" tone="muted" numberOfLines={2}>
-                        {place.secondary}
-                      </AppText>
-                    ) : null}
-                  </View>
+                  <AppText variant="body" numberOfLines={1} style={styles.resultLabel}>
+                    {place.primary}
+                  </AppText>
                 </Pressable>
               ))}
             </ScrollView>
@@ -361,7 +364,7 @@ export default function SelectMap() {
         <View style={styles.mapStatus} pointerEvents="none">
           <AppText
             variant="caption"
-            tone={!mapSelected ? "muted" : matchedZone ? "success" : "danger"}
+            tone={!mapSelected ? "muted" : !hasAddress ? "danger" : matchedZone ? "success" : "danger"}
             numberOfLines={2}>
             {statusText}
           </AppText>
@@ -369,7 +372,7 @@ export default function SelectMap() {
       </View>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space.lg) }]}>
-        {!canContinue && mapSelected && zones !== undefined ? (
+        {mapSelected && zones !== undefined && !geocoding && !matchedZone ? (
           <AppText variant="caption" tone="danger">
             اختر موقعًا داخل إحدى مناطق التوصيل المتاحة للمتابعة.
           </AppText>
@@ -460,7 +463,7 @@ const styles = StyleSheet.create({
   },
   resultDivider: { borderTopWidth: 1, borderTopColor: colors.border },
   resultRowPressed: { backgroundColor: colors.primarySoft },
-  resultText: { flex: 1, gap: 2 },
+  resultLabel: { flex: 1 },
   notePill: {
     alignSelf: "flex-start",
     backgroundColor: colors.surface,

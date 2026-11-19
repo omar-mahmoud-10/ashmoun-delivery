@@ -1,4 +1,4 @@
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -11,6 +11,7 @@ import { TextField } from "@/components/text-field";
 import { ZonePicker } from "@/components/zone-picker";
 import { findZoneForPoint } from "@/lib/geo";
 import { useLocationPicker } from "@/lib/location-picker";
+import { returnToOrigin } from "@/lib/navigation";
 import { colors, space } from "@/theme";
 
 // Completes a delivery-location pick: the detailed street text and zone.
@@ -19,7 +20,12 @@ import { colors, space } from "@/theme";
 // is required (point-in-polygon).
 export default function TypeAddress() {
   const setPicked = useLocationPicker((s) => s.setPicked);
-  const params = useLocalSearchParams<{ lat?: string; lng?: string; address?: string }>();
+  const params = useLocalSearchParams<{
+    lat?: string;
+    lng?: string;
+    address?: string;
+    from?: string;
+  }>();
   const zones = useQuery(api.zones.list);
   const [address, setAddress] = useState(params.address ?? "");
   const [chosenZoneId, setChosenZoneId] = useState<Id<"zones"> | null>(null);
@@ -48,7 +54,7 @@ export default function TypeAddress() {
       deliveryFee: zone.deliveryFee,
       at: Date.now(),
     });
-    router.back();
+    returnToOrigin(params.from);
   }
 
   const ready = !!zone && !outOfZone && address.trim().length >= 1;

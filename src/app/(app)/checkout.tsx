@@ -52,7 +52,7 @@ export default function Checkout() {
   );
 
   function openLocationPicker() {
-    router.push({ pathname: "/select-location", params: { direct: "1" } });
+    router.push({ pathname: "/select-location", params: { from: "/checkout" } });
   }
 
   const shopProblems = useMemo(() => {
@@ -324,7 +324,12 @@ export default function Checkout() {
             })}
 
             {addresses !== undefined && deliverable.length === 0 ? (
-              <Button kind="secondary" label="اختر موقعك على الخريطة" onPress={() => router.push("/select-location")} />
+              <Button
+                kind="secondary"
+                label="اختر موقعك على الخريطة"
+                onPress={() => router.push({ pathname: "/select-location", params: { from: "/checkout" } })}
+              />
+
             ) : null}
           </>
         )}

@@ -175,7 +175,7 @@ color={DARK}
           ))}
           <Pressable
             style={[styles.locationRow, isWebPhone && styles.locationRowWebPhone]}
-            onPress={() => router.navigate("/select-location")}>
+            onPress={() => router.navigate({ pathname: "/select-location", params: { from: "/" } })}>
               <AppText style={styles.locationLabel}>التوصيل إلى </AppText>
               <AppText style={styles.locationArea}>{address ? address.zoneName : "اختر المنطقة"}</AppText>
             <Ionicons name="chevron-down" size={16} color="#fff" />
@@ -227,12 +227,12 @@ color={DARK}
                 accessibilityLabel={c.name}
                 style={styles.quickLink}
                 onPress={() => router.push({ pathname: "/category/[slug]", params: { slug: c.slug ?? c._id } })}>
-                <View style={styles.quickLinkCircle}>
-                  <CategoryArt name={c.name} emoji={c.emoji} size={44} />
+                <View style={styles.quickLinkTile}>
+                  <CategoryArt name={c.name} emoji={c.emoji} size={40} />
+                  <AppText style={styles.quickLinkLabel} numberOfLines={1}>
+                    {c.name}
+                  </AppText>
                 </View>
-                <AppText style={styles.quickLinkLabel} numberOfLines={1}>
-                  {c.name}
-                </AppText>
               </Pressable>
             ))}
           </View>
@@ -419,27 +419,38 @@ const styles = StyleSheet.create({
   quickLinks: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-around",
+    alignItems: "flex-start",
     rowGap: space.sm,
     marginTop: space.lg,
     marginBottom: space.xs,
     paddingHorizontal: space.lg,
   },
-  quickLink: { alignItems: "center", gap: 6, minWidth: 72 },
-  quickLinkCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
-    backgroundColor: "#F7F2EA",
+  // Four fixed columns: nothing is wider than the screen, so no sideways scrolling.
+  quickLink: { width: "25%", alignItems: "center", paddingHorizontal: 4 },
+  quickLinkTile: {
+    width: "100%",
+    maxWidth: 84,
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
+    paddingTop: 10,
+    paddingBottom: 8,
+    paddingHorizontal: 4,
+    borderRadius: radius.md,
+    backgroundColor: "#F7F2EA",
     shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
   },
-  quickLinkLabel: { color: "#48240C", fontWeight: "800", fontSize: 13, textAlign: "center" },
+  quickLinkLabel: {
+    color: "#48240C",
+    fontWeight: "800",
+    fontSize: 11.5,
+    lineHeight: 15,
+    textAlign: "center",
+  },
   // Banner carousel: the track is wider than a card so the neighbouring offers peek in at the edges.
   bannerWrap: { marginTop: space.sm, alignItems: "center" },
   banner: {

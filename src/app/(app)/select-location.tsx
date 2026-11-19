@@ -4,24 +4,28 @@ import { colors, radius, space } from "@/theme";
 import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useRef } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { returnToOrigin } from "@/lib/navigation";
 
 // The hub for choosing how to provide a delivery address. Each option opens
 // its own page; when one of them confirms a pick, this hub pops itself back
 // to the caller (checkout, home, ...) automatically.
 export default function SelectLocation() {
-  const { direct } = useLocalSearchParams<{ direct?: string }>();
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const openedAt = useRef(0);
   const picked = useLocationPicker((s) => s.picked);
 
-  // Prefill params so a previous pick survives re-editing through the chain.
-  function prefill(): Record<string, string> {
+  // Coordinates prefill keeps the map centred on the last pick. The address
+  // text is only carried over for the map (it labels the pin) — never into the
+  // typing field, so nothing is auto-filled there. `from` rides along so the
+  // child pages can return straight to the page that opened this flow.
+  function prefill(withAddress: boolean): Record<string, string> {
     const p: Record<string, string> = {};
     if (picked?.lat !== undefined && picked?.lng !== undefined) {
       p.lat = String(picked.lat);
       p.lng = String(picked.lng);
     }
-    if (picked?.address) p.address = picked.address;
-    if (direct) p.direct = direct;
+    if (withAddress && picked?.address) p.address = picked.address;
+    if (from) p.from = from;
     return p;
   }
 
@@ -30,8 +34,8 @@ export default function SelectLocation() {
       // Record when the hub first opened; a pick confirmed after that means a
       // child page just finished — return to whoever opened the flow.
       if (openedAt.current === 0) openedAt.current = Date.now();
-      if (picked?.at !== undefined && picked.at > openedAt.current) router.back();
-    }, [picked]),
+      if (picked?.at !== undefined && picked.at > openedAt.current) returnToOrigin(from);
+    }, [picked, from]),
   );
 
   return (
@@ -44,7 +48,7 @@ export default function SelectLocation() {
 
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.push({ pathname: "/select-map", params: prefill() })}
+        onPress={() => router.push({ pathname: "/select-map", params: prefill(true) })}
         style={styles.card}>
         <AppText style={styles.emoji}>📍</AppText>
         <View style={styles.cardBody}>
@@ -58,7 +62,7 @@ export default function SelectLocation() {
 
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.push({ pathname: "/type-address", params: prefill() })}
+        onPress={() => router.push({ pathname: "/type-address", params: prefill(false) })}
         style={styles.card}>
         <AppText style={styles.emoji}>⌨️</AppText>
         <View style={styles.cardBody}>
