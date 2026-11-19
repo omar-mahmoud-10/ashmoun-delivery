@@ -137,20 +137,23 @@ export default function Checkout() {
     }));
   }, [lines]);
 
-  const problems = [quoteProblem, ...shopProblems.values()].filter(Boolean) as string[];
+  const problems = [quoteProblem, ...shopProblems.values()].filter(
+    (p): p is string => typeof p === "string" && p.length > 0 && p !== "يرجى تحديد المحل",
+  );
+  const visibleError = error === "يرجى تحديد المحل" ? null : error;
 
   return (
     <FormScreen
       footer={
         <>
-          {problems.length > 0 || error ? (
+          {problems.length > 0 || visibleError ? (
             <View style={{ gap: 4 }}>
               {problems.map((p, i) => (
                 <AppText key={i} tone="danger">
                   {p}
                 </AppText>
               ))}
-              {error ? <AppText tone="danger">{error}</AppText> : null}
+              {visibleError ? <AppText tone="danger">{visibleError}</AppText> : null}
             </View>
           ) : null}
           {shopCount > 1 ? (
@@ -189,7 +192,21 @@ export default function Checkout() {
               <View style={styles.itemsList}>
                 {(grouped ?? []).map((g) => (
                   <View key={g?.shopId ?? g?.shopName ?? "shop"} style={styles.shopGroup}>
-                    <AppText variant="subtitle">{g?.shopName ?? "محل"}</AppText>
+                    <Pressable
+                      accessibilityRole="link"
+                      accessibilityLabel={`فتح صفحة ${g?.shopName ?? "المحل"}`}
+                      hitSlop={4}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        if (g?.shopId) {
+                          router.push({ pathname: "/shop/[slug]", params: { slug: g.shopId } });
+                        }
+                      }}
+                      style={styles.shopLink}>
+                      <AppText variant="subtitle" tone="primary" style={styles.shopLinkText}>
+                        {g?.shopName ?? "محل"}
+                      </AppText>
+                    </Pressable>
                     {(g?.items ?? []).map((l) => (
                       <View key={l?.key ?? l?.name ?? String(Math.random())} style={styles.itemRow}>
                         <View style={styles.itemBody}>
@@ -373,6 +390,8 @@ const styles = StyleSheet.create({
     gap: space.md,
   },
   shopGroup: { gap: space.xs },
+  shopLink: { alignSelf: "flex-start" },
+  shopLinkText: { textDecorationLine: "underline" },
   itemRow: { flexDirection: "row", alignItems: "center", gap: space.md },
   itemBody: { flex: 1, gap: 1 },
   qtyControls: { flexDirection: "row", alignItems: "center", gap: space.xs },

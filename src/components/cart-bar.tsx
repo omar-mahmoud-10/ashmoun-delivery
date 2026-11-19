@@ -1,16 +1,21 @@
 ﻿import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
-import { useEffect, useRef } from "react";
+import { router, usePathname } from "expo-router";
+import { useEffect, useState } from "react";
 import { Animated, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cartCount, cartSubtotal, useCart } from "@/lib/cart";
 import { colors, space } from "@/theme";
 import { AppText } from "./app-text";
 
+const HIDDEN_PATHS = ["/checkout", "/select-map"];
+// Store screens render their own cart button in the header.
+const HEADER_CART_PREFIXES = ["/shop", "/product"];
+
 export function CartBar() {
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const lines = useCart((s) => s.lines);
-  const pulse = useRef(new Animated.Value(1)).current;
+  const [pulse] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     if (lines.length === 0) return;
@@ -24,7 +29,13 @@ export function CartBar() {
     return () => loop.stop();
   }, [lines.length, pulse]);
 
-  if (lines.length === 0) return null;
+  if (
+    lines.length === 0 ||
+    HIDDEN_PATHS.includes(pathname) ||
+    HEADER_CART_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  ) {
+    return null;
+  }
   const count = cartCount(lines);
   const subtotal = cartSubtotal(lines);
 

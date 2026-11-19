@@ -1,5 +1,5 @@
 import { useQuery } from "convex/react";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import { isShopOpen } from "@/convex/lib/hours";
 import { MAX_QUANTITY, priceLine } from "@/convex/lib/pricing";
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
+import { CartHeaderButton } from "@/components/cart-header-button";
 import { EmojiTile } from "@/components/emoji-tile";
 import { StepButton } from "@/components/step-button";
 import { todayHoursLabel } from "@/components/shop-status";
@@ -65,11 +66,13 @@ export default function Product() {
         quantity,
       },
     );
-    router.dismissTo({ pathname: "/shop/[slug]", params: { slug: shop.slug ?? shop._id } });
+    if (router.canGoBack()) router.back();
+    else router.replace({ pathname: "/shop/[slug]", params: { slug: shop.slug ?? shop._id } });
   }
 
   return (
     <SafeAreaView style={styles.screen} edges={Platform.OS === "web" ? [] : ["bottom"]}>
+      <Stack.Screen options={{ headerRight: () => <CartHeaderButton /> }} />
       <ScrollView contentContainerStyle={[styles.content, Platform.OS === "web" && styles.contentWeb]}>
         <View style={styles.header}>
           <EmojiTile emoji={product.emoji} tint={shop.tint} size={96} />

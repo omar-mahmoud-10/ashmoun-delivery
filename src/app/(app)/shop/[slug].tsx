@@ -1,4 +1,5 @@
 import { AppText } from "@/components/app-text";
+import { CartHeaderButton } from "@/components/cart-header-button";
 import { EmojiTile } from "@/components/emoji-tile";
 import { ShopReviews } from "@/components/shop-reviews";
 import { shopState, ShopStatusBadge, todayHoursLabel } from "@/components/shop-status";
@@ -12,7 +13,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAction, useMutation, useQuery } from "convex/react";
 import * as ImagePicker from "expo-image-picker";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -149,7 +150,7 @@ export default function Shop() {
         setSubmitting(false);
       }
     },
-    [submitting, imageUri, description, createRequest],
+    [submitting, imageUri, description, createRequest, uploadImageAction],
   );
 
   const q = query.trim().toLowerCase();
@@ -167,6 +168,15 @@ export default function Shop() {
       })
       .filter((section) => section.products.length > 0);
   }, [data, q]);
+
+  const addedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (addedTimeout.current) clearTimeout(addedTimeout.current);
+    },
+    [],
+  );
 
   const addToCart = useCallback(
     (shopId: Id<"shops">, shopName: string, item: Product) => {
@@ -188,13 +198,11 @@ export default function Shop() {
         },
       );
       setAddedItem(item.name);
-      if (addedTimeout) clearTimeout(addedTimeout);
-      addedTimeout = setTimeout(() => setAddedItem(null), 2000);
+      if (addedTimeout.current) clearTimeout(addedTimeout.current);
+      addedTimeout.current = setTimeout(() => setAddedItem(null), 2000);
     },
     [cart],
   );
-
-  let addedTimeout: ReturnType<typeof setTimeout>;
 
   if (data === undefined) return <ActivityIndicator style={styles.loading} color={colors.primary} />;
   if (data === null) return <Unavailable message="هذا المحل غير متاح حاليًا" />;
@@ -396,6 +404,7 @@ export default function Shop() {
           headerStyle: { backgroundColor: colors.background },
           headerTintColor: colors.ink,
           headerTitleStyle: { fontFamily: fonts.bold, color: colors.ink },
+          headerRight: () => <CartHeaderButton />,
         }}
       />
       <ScrollView

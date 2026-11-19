@@ -1,5 +1,6 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import * as ExpoLocation from "expo-location";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -7,6 +8,7 @@ import {
   Keyboard,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -18,6 +20,7 @@ import { Button } from "@/components/button";
 import { LocationMap, type MapCenter } from "@/components/location-map";
 import { findZoneForPoint } from "@/lib/geo";
 import { useLocationPicker } from "@/lib/location-picker";
+import { MIN_SEARCH_LENGTH, searchPlaces, type PlaceResult } from "@/lib/place-search";
 import { colors, fonts, radius, space } from "@/theme";
 
 const FALLBACK: MapCenter = { lat: 30.635, lng: 31.083 };
@@ -39,12 +42,16 @@ export default function SelectMap() {
   const [placeLabel, setPlaceLabel] = useState<string | null>(params.address ?? null);
   const [geocoding, setGeocoding] = useState(false);
   const [query, setQuery] = useState("");
+  const [results, setResults] = useState<PlaceResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [noResults, setNoResults] = useState(false);
   const [locating, setLocating] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const mounted = useRef(false);
   const seq = useRef(0);
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeq = useRef(0);
 
   const matchedZone = mapSelected && zones ? findZoneForPoint(center, zones) : undefined;
   const canContinue = mapSelected && !!matchedZone;
@@ -59,6 +66,7 @@ export default function SelectMap() {
   useEffect(
     () => () => {
       if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
+      if (suggestTimer.current) clearTimeout(suggestTimer.current);
     },
     [],
   );
@@ -99,9 +107,104 @@ export default function SelectMap() {
   }
 
   function pickMap(next: MapCenter) {
+    resetSuggestions();
     setCenter(next);
     setMapSelected(true);
     lookupPlace(next);
+  }
+
+  function cancelSuggestTimer() {
+    if (suggestTimer.current) {
+      clearTimeout(suggestTimer.current);
+      suggestTimer.current = null;
+    }
+  }
+
+  // Drops the open suggestion list and ignores any response still in flight.
+  function resetSuggestions() {
+    cancelSuggestTimer();
+    searchSeq.current++;
+    setResults([]);
+    setNoResults(false);
+    setSearching(false);
+  }
+
+  function choosePlace(place: PlaceResult) {
+    cancelSuggestTimer();
+    searchSeq.current++;
+    if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
+    // Keep the chosen name instead of letting an older reverse lookup overwrite it.
+    seq.current++;
+    setGeocoding(false);
+    setSearching(false);
+    setResults([]);
+    setNoResults(false);
+    setSearchError(null);
+    setQuery(place.primary);
+    setPlaceLabel(place.full);
+    setCenter({ lat: place.lat, lng: place.lng });
+    setMapSelected(true);
+    Keyboard.dismiss();
+  }
+
+  async function runSearch(raw: string, autoPick: boolean) {
+    const q = raw.trim();
+    if (q.length < MIN_SEARCH_LENGTH) {
+      if (!autoPick) return;
+      resetSuggestions();
+      setSearchError(`اكتب ${MIN_SEARCH_LENGTH} أحرف على الأقل للبحث`);
+      return;
+    }
+    cancelSuggestTimer();
+    const id = ++searchSeq.current;
+    setSearching(true);
+    setNoResults(false);
+    setSearchError(null);
+    try {
+      const found = await searchPlaces(q);
+      if (searchSeq.current !== id) return;
+      if (found.length === 0) {
+        setResults([]);
+        setNoResults(true);
+        return;
+      }
+      if (autoPick && found.length === 1) {
+        choosePlace(found[0]);
+        return;
+      }
+      setResults(found);
+    } catch {
+      if (searchSeq.current !== id) return;
+      setResults([]);
+      setSearchError("تعذر البحث عن المكان");
+    } finally {
+      if (searchSeq.current === id) setSearching(false);
+    }
+  }
+
+  function onChangeQuery(text: string) {
+    setQuery(text);
+    setSearchError(null);
+    resetSuggestions();
+    if (text.trim().length < MIN_SEARCH_LENGTH) return;
+    suggestTimer.current = setTimeout(() => void runSearch(text, false), 600);
+  }
+
+  function search() {
+    const q = query.trim();
+    if (q.length < MIN_SEARCH_LENGTH) {
+      resetSuggestions();
+      setSearchError(`اكتب ${MIN_SEARCH_LENGTH} أحرف على الأقل للبحث`);
+      return;
+    }
+    Keyboard.dismiss();
+    void runSearch(q, true);
+  }
+
+  function clearQuery() {
+    resetSuggestions();
+    setQuery("");
+    setSearchError(null);
   }
 
   async function locateMe(silent = false) {
@@ -122,42 +225,6 @@ export default function SelectMap() {
       if (!silent) setSearchError("تعذر تحديد موقعك الحالي");
     } finally {
       setLocating(false);
-    }
-  }
-
-  async function search() {
-    const q = query.trim();
-    if (q.length < 2) return;
-    Keyboard.dismiss();
-    setSearching(true);
-    setSearchError(null);
-    try {
-      if (Platform.OS === "web") {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
-          { headers: { "Accept-Language": "ar" } },
-        );
-        const data = (await res.json()) as { lat?: string; lon?: string; display_name?: string }[];
-        if (data[0]?.lat && data[0]?.lon) {
-          setPlaceLabel(data[0].display_name ?? null);
-          seq.current++;
-          setCenter({ lat: Number(data[0].lat), lng: Number(data[0].lon) });
-          setMapSelected(true);
-        } else {
-          setSearchError("لم يتم العثور على المكان");
-        }
-      } else {
-        const results = await ExpoLocation.geocodeAsync(q);
-        if (results[0]) {
-          pickMap({ lat: results[0].latitude, lng: results[0].longitude });
-        } else {
-          setSearchError("لم يتم العثور على المكان");
-        }
-      }
-    } catch {
-      setSearchError("تعذر البحث عن المكان");
-    } finally {
-      setSearching(false);
     }
   }
 
@@ -201,9 +268,10 @@ export default function SelectMap() {
       <View style={styles.mapWrap}>
         <View style={styles.searchWrap} pointerEvents="box-none">
           <View style={styles.searchBar}>
+            <Ionicons name="search" size={18} color={colors.muted} />
             <TextInput
               value={query}
-              onChangeText={setQuery}
+              onChangeText={onChangeQuery}
               placeholder="ابحث عن مكان أو عنوان..."
               placeholderTextColor={colors.placeholder}
               style={styles.input}
@@ -211,6 +279,16 @@ export default function SelectMap() {
               onSubmitEditing={search}
               textAlign={Platform.OS === "web" ? "right" : undefined}
             />
+            {query.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="مسح البحث"
+                onPress={clearQuery}
+                hitSlop={8}
+                style={styles.clearBtn}>
+                <Ionicons name="close-circle" size={18} color={colors.faint} />
+              </Pressable>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="بحث"
@@ -227,6 +305,48 @@ export default function SelectMap() {
               )}
             </Pressable>
           </View>
+
+          {results.length > 0 ? (
+            <ScrollView
+              style={styles.resultsPanel}
+              contentContainerStyle={styles.resultsContent}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled>
+              {results.map((place, index) => (
+                <Pressable
+                  key={place.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={place.full}
+                  onPress={() => choosePlace(place)}
+                  style={({ pressed }) => [
+                    styles.resultRow,
+                    index > 0 && styles.resultDivider,
+                    pressed && styles.resultRowPressed,
+                  ]}>
+                  <Ionicons name="location-outline" size={18} color={colors.primary} />
+                  <View style={styles.resultText}>
+                    <AppText variant="body" numberOfLines={1}>
+                      {place.primary}
+                    </AppText>
+                    {place.secondary ? (
+                      <AppText variant="caption" tone="muted" numberOfLines={2}>
+                        {place.secondary}
+                      </AppText>
+                    ) : null}
+                  </View>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : null}
+
+          {noResults ? (
+            <View style={styles.notePill}>
+              <AppText variant="caption" tone="muted">
+                لا توجد نتائج مطابقة
+              </AppText>
+            </View>
+          ) : null}
+
           {searchError ? (
             <View style={styles.errorPill}>
               <AppText variant="caption" tone="danger">
@@ -312,6 +432,43 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: space.md,
+  },
+  clearBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: space.xs,
+  },
+  resultsPanel: {
+    maxHeight: 300,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  resultsContent: { paddingVertical: space.xs },
+  resultRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+  },
+  resultDivider: { borderTopWidth: 1, borderTopColor: colors.border },
+  resultRowPressed: { backgroundColor: colors.primarySoft },
+  resultText: { flex: 1, gap: 2 },
+  notePill: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
   },
   errorPill: {
     alignSelf: "flex-start",

@@ -61,6 +61,7 @@ export function LocationMap({ center, onCenterChange, onReady }: Props) {
   const ready = useRef(false);
   const onCenterChangeRef = useRef(onCenterChange);
   const onReadyRef = useRef(onReady);
+  const programmatic = useRef(false);
   const initLat = useRef(center.lat);
   const initLng = useRef(center.lng);
 
@@ -88,6 +89,12 @@ export function LocationMap({ center, onCenterChange, onReady }: Props) {
       map.on("moveend", () => {
         const c = map.getCenter();
         last.current = { lat: c.lat, lng: c.lng };
+        // Ignore the move we caused ourselves (search result, my location), so it
+        // is not reported back as a user drag.
+        if (programmatic.current) {
+          programmatic.current = false;
+          return;
+        }
         onCenterChangeRef.current(last.current);
       });
       mapRef.current = map;
@@ -109,7 +116,13 @@ export function LocationMap({ center, onCenterChange, onReady }: Props) {
     if (!map || !ready.current) return;
     if (Math.abs(last.current.lat - center.lat) < 1e-6 && Math.abs(last.current.lng - center.lng) < 1e-6) return;
     last.current = center;
+    programmatic.current = true;
     map.setView([center.lat, center.lng], map.getZoom());
+    // setView normally fires moveend right away; clear the flag as a safety net.
+    const fallback = setTimeout(() => {
+      programmatic.current = false;
+    }, 500);
+    return () => clearTimeout(fallback);
   }, [center]);
 
   return (

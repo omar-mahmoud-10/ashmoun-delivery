@@ -1,6 +1,6 @@
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
-import { CartBar } from "@/components/cart-bar";
+
 import { CategoryArt } from "@/components/category-art";
 import { FlashOfferCard } from "@/components/flash-offer-card";
 import { OfferBanner } from "@/components/offer-banner";
@@ -365,7 +365,6 @@ color={DARK}
         </View>
       ) : null}
 
-      <CartBar />
     </View>
   );
 }
