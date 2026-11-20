@@ -1,12 +1,13 @@
 import { useMutation, useQuery } from "convex/react";
 import { Link, router } from "expo-router";
-import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
 import { confirm } from "@/lib/confirm";
+import { useLocationPicker } from "@/lib/location-picker";
 import { useSignOut } from "@/lib/push";
 import { errorMessage } from "@/lib/errors";
 import { colors, formatPrice, radius, space } from "@/theme";
@@ -16,9 +17,40 @@ export default function Profile() {
   const addresses = useQuery(api.addresses.mine);
   const setDefault = useMutation(api.addresses.setDefault);
   const remove = useMutation(api.addresses.remove);
+  const create = useMutation(api.addresses.create);
+  const pickedLoc = useLocationPicker((s) => s.picked);
+  const setPicked = useLocationPicker((s) => s.setPicked);
   const signOut = useSignOut();
   const [error, setError] = useState<string | null>(null);
   const sortedAddresses = [...(addresses ?? [])].sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
+
+  useEffect(() => {
+    if (!pickedLoc?.zoneId || !pickedLoc.address) return;
+    // Wait for the session to resolve before saving; a logged-out user can't.
+    if (me === undefined) return;
+    if (me === null) {
+      setPicked(null);
+      return;
+    }
+    void (async () => {
+      setError(null);
+      try {
+        await create({
+          zoneId: pickedLoc.zoneId!,
+          label: "البيت",
+          street: pickedLoc.address!,
+          landmark: "",
+          location:
+            pickedLoc.lat !== undefined && pickedLoc.lng !== undefined
+              ? { lat: pickedLoc.lat, lng: pickedLoc.lng }
+              : undefined,
+        });
+        setPicked(null);
+      } catch (e) {
+        setError(errorMessage(e));
+      }
+    })();
+  }, [pickedLoc, me]);
 
   async function run(action: () => Promise<unknown>) {
     setError(null);
@@ -32,6 +64,19 @@ export default function Profile() {
   async function onRemove(addressId: Id<"addresses">, label: string) {
     const sure = await confirm({ title: "حذف العنوان؟", message: `سيتم حذف عنوان "${label}".`, confirmLabel: "حذف" });
     if (sure) await run(() => remove({ addressId }));
+  }
+
+  function onAddAddress() {
+    if (me === null) {
+      if (Platform.OS === "web") {
+        setError("يرجى تسجيل الدخول أولًا لإضافة عنوان.");
+      } else {
+        Alert.alert("سجّل الدخول أولًا", "يرجى تسجيل الدخول لإضافة عنوان.");
+      }
+      return;
+    }
+    setError(null);
+    router.push({ pathname: "/select-location", params: { from: "/profile" } });
   }
 
   return (
@@ -60,7 +105,7 @@ export default function Profile() {
         <AppText variant="subtitle">عناويني</AppText>
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push({ pathname: "/select-location", params: { from: "/profile" } })}
+          onPress={onAddAddress}
           hitSlop={8}
           style={styles.link}>
           <AppText variant="caption" tone="primaryInk">
@@ -72,7 +117,7 @@ export default function Profile() {
         <View key={address._id} style={[styles.card, address.isDefault && styles.defaultCard]}>
           <View style={styles.sectionRow}>
             <AppText variant="subtitle">
-              {address.label} · {address.zoneName}
+              {address.zoneName}
             </AppText>
             {address.isDefault ? (
               <View style={styles.defaultPill}>
@@ -117,7 +162,9 @@ export default function Profile() {
       ))}
       {error ? <AppText tone="danger">{error}</AppText> : null}
       {me?.isAdmin ? <Button kind="secondary" label="🛠️ لوحة التحكم" onPress={() => router.push("/admin")} /> : null}
-      <Button kind="danger" label="تسجيل الخروج" onPress={() => void signOut()} />
+      {me !== null && me !== undefined ? (
+        <Button kind="danger" label="تسجيل الخروج" onPress={() => void signOut()} />
+      ) : null}
     </ScrollView>
   );
 }

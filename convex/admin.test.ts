@@ -34,7 +34,7 @@ async function setup() {
   const asCustomer = t.withIdentity({ subject: `${ids.customerId}|s` });
   const asAdmin = t.withIdentity({ subject: `${ids.adminId}|s` });
   const res = await asCustomer.mutation(api.orders.place, {
-    addressId: ids.addressId, note: "", items: [{ productId: ids.milk, quantity: 1, selections: [] }],
+    addressId: ids.addressId, note: "", items: [{ productId: ids.milk, quantity: 1, selections: [] }], payment: "cod",
   });
   const orderId = res.orderIds[0];
   return { t, asCustomer, asAdmin, orderId, ...ids };

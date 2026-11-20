@@ -164,7 +164,7 @@ export default defineSchema({
     subtotal: v.number(),
     deliveryFee: v.number(),
     total: v.number(),
-    payment: v.literal("cod"),
+    payment: v.union(v.literal("cod"), v.literal("vfcash"), v.literal("instapay")),
     status: orderStatus,
     history: v.array(
       v.object({ status: orderStatus, at: v.number(), by: v.optional(v.id("users")) }),

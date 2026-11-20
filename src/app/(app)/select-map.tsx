@@ -84,16 +84,18 @@ export default function SelectMap() {
   async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
     if (Platform.OS === "web") {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=17&accept-language=ar`,
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=ar`,
         { headers: { "Accept-Language": "ar" } },
       );
-      const data = (await res.json()) as { display_name?: string };
-      return data.display_name ?? null;
+      const data = (await res.json()) as { address?: Record<string, string> };
+      const a = data.address ?? {};
+      const street = a.road ?? a.pedestrian ?? a.footway ?? a.path ?? "";
+      return street || null;
     }
     const results = await ExpoLocation.reverseGeocodeAsync({ latitude: lat, longitude: lng });
     const a = results[0];
     if (!a) return null;
-    return [a.street ?? a.name, a.city ?? a.subregion, a.region].filter(Boolean).join("، ") || null;
+    return a.street ?? a.name ?? null;
   }
 
   function lookupPlace(next: MapCenter) {
@@ -385,7 +387,7 @@ export default function SelectMap() {
             onPress={() => void locateMe()}
             style={styles.actionBtn}
           />
-          <Button label="متابعة" onPress={confirm} disabled={!canContinue} style={styles.actionBtn} />
+          <Button label="متابعة" onPress={confirm} disabled={!canContinue} loading={geocoding} style={styles.actionBtn} />
         </View>
       </View>
     </View>

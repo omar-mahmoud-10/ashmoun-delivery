@@ -91,6 +91,7 @@ export const place = mutation({
     customerName: v.optional(v.string()),
     customerPhone: v.optional(v.string()),
     note: v.string(),
+    payment: v.union(v.literal("cod"), v.literal("vfcash"), v.literal("instapay")),
     items: cartItems,
   },
   handler: async (ctx, args) => {
@@ -98,8 +99,8 @@ export const place = mutation({
     const user = userId === null ? null : await ctx.db.get(userId);
 
     let zone, label, street, landmark, location;
-    if (user) {
-      if (!args.addressId) throw new ConvexError("العنوان غير موجود");
+    if (user && args.addressId) {
+      // A saved address wins when the customer picked one from their list.
       const address = await ctx.db.get(args.addressId);
       if (address === null || address.userId !== user._id) throw new ConvexError("العنوان غير موجود");
       zone = await ctx.db.get(address.zoneId);
@@ -108,10 +109,14 @@ export const place = mutation({
       landmark = address.landmark;
       location = address.location;
     } else {
+      // No saved address: the customer pinned a spot on the map. Guests always
+      // arrive here; a logged-in customer lands here when they picked a spot
+      // instead of one of their saved addresses.
       if (!args.zoneId) throw new ConvexError("يرجى اختيار منطقة التوصيل");
       zone = await ctx.db.get(args.zoneId);
       street = (args.street ?? "").trim();
       if (street.length < 1) throw new ConvexError("يرجى كتابة العنوان");
+      location = args.location;
     }
     if (zone === null || !zone.active) throw new ConvexError("التوصيل متوقف في هذه المنطقة حاليًا");
 
@@ -161,7 +166,7 @@ export const place = mutation({
         subtotal,
         deliveryFee: zone.deliveryFee,
         total: subtotal + zone.deliveryFee,
-        payment: "cod",
+        payment: args.payment,
         status: "created",
         history: [{ status: "created", at: now, by: user?._id }],
       });

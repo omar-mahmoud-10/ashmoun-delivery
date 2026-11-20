@@ -69,7 +69,7 @@ describe("orders.place", () => {
   test("prices items on the server and adds the zone delivery fee", async () => {
     const { asUser, market, addressId, milk, bread } = await setup();
     const res = await asUser.mutation(api.orders.place, {
-      addressId, note: " بسرعة ", items: [line(milk, 2), line(bread)],
+      addressId, note: " بسرعة ", items: [line(milk, 2), line(bread)], payment: "cod",
     });
     expect(res.orderIds).toHaveLength(1);
     const order = await asUser.query(api.orders.get, { orderId: res.orderIds[0] });
@@ -84,7 +84,7 @@ describe("orders.place", () => {
   test("allows items from different shops and creates one order per shop", async () => {
     const { asUser, market, sweets, addressId, milk, fries } = await setup();
     const res = await asUser.mutation(api.orders.place, {
-      addressId, note: "", items: [line(milk), line(fries)],
+      addressId, note: "", items: [line(milk), line(fries)], payment: "cod",
     });
     expect(res.orderIds).toHaveLength(2);
     const orders = await Promise.all(res.orderIds.map((id) => asUser.query(api.orders.get, { orderId: id })));
@@ -95,7 +95,7 @@ describe("orders.place", () => {
   test("rejects a closed (paused) shop", async () => {
     const { asUser, sweets, addressId, basbousa } = await setup();
     await expect(
-      asUser.mutation(api.orders.place, { addressId, note: "", items: [line(basbousa)] }),
+      asUser.mutation(api.orders.place, { addressId, note: "", items: [line(basbousa)], payment: "cod" }),
     ).rejects.toThrow("متوقف");
   });
 
@@ -103,30 +103,30 @@ describe("orders.place", () => {
     const { t, asUser, market, addressId, milk } = await setup();
     await t.run((ctx) => ctx.db.patch(market, { hours: [] }));
     await expect(
-      asUser.mutation(api.orders.place, { addressId, note: "", items: [line(milk)] }),
+      asUser.mutation(api.orders.place, { addressId, note: "", items: [line(milk)], payment: "cod" }),
     ).rejects.toThrow("مغلق");
   });
 
   test("rejects a subtotal under the shop's minimum order", async () => {
     const { asUser, market, addressId, bread } = await setup();
     await expect(
-      asUser.mutation(api.orders.place, { addressId, note: "", items: [line(bread)] }),
+      asUser.mutation(api.orders.place, { addressId, note: "", items: [line(bread)], payment: "cod" }),
     ).rejects.toThrow("الحد الأدنى");
   });
 
   test("rejects someone else's address and bad quantities", async () => {
     const { asUser, market, addressId, otherAddressId, milk } = await setup();
     await expect(
-      asUser.mutation(api.orders.place, { addressId: otherAddressId, note: "", items: [line(milk)] }),
+      asUser.mutation(api.orders.place, { addressId: otherAddressId, note: "", items: [line(milk)], payment: "cod" }),
     ).rejects.toThrow("العنوان");
     await expect(
-      asUser.mutation(api.orders.place, { addressId, note: "", items: [line(milk, 0.5)] }),
+      asUser.mutation(api.orders.place, { addressId, note: "", items: [line(milk, 0.5)], payment: "cod" }),
     ).rejects.toThrow("كمية");
   });
 
   test("other users can't read the order", async () => {
     const { t, asUser, market, addressId, milk } = await setup();
-    const res = await asUser.mutation(api.orders.place, { addressId, note: "", items: [line(milk)] });
+    const res = await asUser.mutation(api.orders.place, { addressId, note: "", items: [line(milk)], payment: "cod" });
     const orderId = res.orderIds[0];
     const otherId = await t.run(async (ctx) => (await ctx.db.query("users").collect())[1]._id);
     expect(await t.withIdentity({ subject: `${otherId}|s` }).query(api.orders.get, { orderId })).toBeNull();
@@ -154,6 +154,7 @@ describe("guest orders", () => {
       customerName: "زائر",
       customerPhone: "01000000000",
       note: "",
+      payment: "cod",
       items,
     });
     const orderId = res.orderIds[0];
@@ -175,14 +176,14 @@ describe("guest orders", () => {
   test("guest orders require a zone, an address, and a phone", async () => {
     const { t, market, milk } = await setup();
     await expect(
-      t.mutation(api.orders.place, { street: "شارع", customerPhone: "0100", note: "", items: [line(milk)] }),
+      t.mutation(api.orders.place, { street: "شارع", customerPhone: "0100", note: "", items: [line(milk)], payment: "cod" }),
     ).rejects.toThrow("منطقة");
     const zoneId = await t.run(async (ctx) => (await ctx.db.query("zones").collect())[0]._id);
     await expect(
-      t.mutation(api.orders.place, { zoneId, customerPhone: "0100", note: "", items: [line(milk)] }),
+      t.mutation(api.orders.place, { zoneId, customerPhone: "0100", note: "", items: [line(milk)], payment: "cod" }),
     ).rejects.toThrow("العنوان");
     await expect(
-      t.mutation(api.orders.place, { zoneId, street: "شارع", customerPhone: "0100", note: "", items: [line(milk)] }),
+      t.mutation(api.orders.place, { zoneId, street: "شارع", customerPhone: "0100", note: "", items: [line(milk)], payment: "cod" }),
     ).rejects.toThrow("جوال");
   });
 });
@@ -190,13 +191,13 @@ describe("guest orders", () => {
 describe("orders.cancel", () => {
   test("customers can cancel while the order is created, not after it's confirmed", async () => {
     const { t, asUser, market, addressId, milk } = await setup();
-    const firstRes = await asUser.mutation(api.orders.place, { addressId, note: "", items: [line(milk)] });
+    const firstRes = await asUser.mutation(api.orders.place, { addressId, note: "", items: [line(milk)], payment: "cod" });
     const first = firstRes.orderIds[0];
     await asUser.mutation(api.orders.cancel, { orderId: first });
     expect((await asUser.query(api.orders.get, { orderId: first }))?.status).toBe("cancelled");
     await expect(asUser.mutation(api.orders.cancel, { orderId: first })).rejects.toThrow("مسبقًا");
 
-    const secondRes = await asUser.mutation(api.orders.place, { addressId, note: "", items: [line(milk)] });
+    const secondRes = await asUser.mutation(api.orders.place, { addressId, note: "", items: [line(milk)], payment: "cod" });
     const second = secondRes.orderIds[0];
     await t.run((ctx) => ctx.db.patch(second, { status: "confirmed" }));
     await expect(asUser.mutation(api.orders.cancel, { orderId: second })).rejects.toThrow("لا يمكن");
@@ -204,7 +205,7 @@ describe("orders.cancel", () => {
 
   test("other users can't cancel someone's order", async () => {
     const { t, asUser, market, addressId, milk } = await setup();
-    const res = await asUser.mutation(api.orders.place, { addressId, note: "", items: [line(milk)] });
+    const res = await asUser.mutation(api.orders.place, { addressId, note: "", items: [line(milk)], payment: "cod" });
     const orderId = res.orderIds[0];
     const otherId = await t.run(async (ctx) => (await ctx.db.query("users").collect())[1]._id);
     await expect(

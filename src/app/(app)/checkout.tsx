@@ -1,19 +1,21 @@
-import { useMutation, useQuery } from "convex/react";
-import { router, Stack, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { isOpenAt } from "@/convex/lib/hours";
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
 import { FormScreen } from "@/components/form-screen";
 import { PriceSummary } from "@/components/price-summary";
 import { TextField } from "@/components/text-field";
-import { cartCount, cartShops, cartSubtotal, useCart } from "@/lib/cart";import { errorMessage } from "@/lib/errors";
-import { useLocationPicker, type PickedLocation } from "@/lib/location-picker";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { isOpenAt } from "@/convex/lib/hours";
+import { cartCount, cartShops, cartSubtotal, useCart } from "@/lib/cart";
+import { errorMessage } from "@/lib/errors";
+import { useGuest } from "@/lib/guest";
+import { useLocationPicker } from "@/lib/location-picker";
 import { useNow } from "@/lib/use-now";
 import { colors, formatPrice, radius, space } from "@/theme";
+import { useMutation, useQuery } from "convex/react";
+import { router, Stack } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 export default function Checkout() {
   const { lines, clear, setQuantity } = useCart();
@@ -29,14 +31,20 @@ export default function Checkout() {
   );
 
   const [chosenId, setChosenId] = useState<Id<"addresses"> | null>(null);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const name = useGuest((s) => s.name);
+  const phone = useGuest((s) => s.phone);
+  const setName = useGuest((s) => s.setName);
+  const setPhone = useGuest((s) => s.setPhone);
   const [note, setNote] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "vfcash" | "instapay">("cod");
   const [error, setError] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState(false);
-  const pickedFromStore = useLocationPicker((s) => s.picked);
-  const [pickedLoc, setPickedLoc] = useState<PickedLocation | null>(null);
+  // Read the pick straight from the store instead of copying it into local state:
+  // the map confirms by writing the store and navigating back in the same tick, so
+  // a focus-effect copy could run before the new value was rendered and drop it.
+  const pickedLoc = useLocationPicker((s) => s.picked);
+  const setPicked = useLocationPicker((s) => s.setPicked);
   const deliverable = addresses?.filter((a) => a.zoneActive) ?? [];
   const address =
     deliverable.find((a) => a._id === chosenId) ?? deliverable.find((a) => a.isDefault) ?? deliverable[0];
@@ -44,12 +52,6 @@ export default function Checkout() {
   const [showItems, setShowItems] = useState(false);
   const count = cartCount(lines);
   const shops = cartShops(lines);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (pickedFromStore) setPickedLoc(pickedFromStore);
-    }, [pickedFromStore]),
-  );
 
   function openLocationPicker() {
     router.push({ pathname: "/select-location", params: { from: "/checkout" } });
@@ -82,22 +84,25 @@ export default function Checkout() {
 
   async function submit() {
     if (lines.length === 0 || placing) return;
-    if (!guest && !address) return;
-    if (guest && (!pickedLoc?.zoneId || !pickedLoc?.address || phone.trim().length < 6)) return;
+    // A spot confirmed on the map is the destination; otherwise a saved address is.
+    const pin = pickedLoc !== null;
+    if (pin && (!pickedLoc.zoneId || !pickedLoc.address)) return;
+    if (guest ? !pin || phone.trim().length < 6 : !pin && !address) return;
     setError(null);
     setPlacing(true);
     try {
       const res = await place({
-        addressId: guest ? undefined : address?._id,
-        zoneId: guest ? pickedLoc?.zoneId : undefined,
-        street: guest ? (pickedLoc?.address ?? "") : undefined,
+        addressId: pin || guest ? undefined : address?._id,
+        zoneId: pin || guest ? pickedLoc?.zoneId : undefined,
+        street: pin || guest ? (pickedLoc?.address ?? "") : undefined,
         location:
-          guest && pickedLoc?.lat !== undefined && pickedLoc?.lng !== undefined
+          pin && pickedLoc?.lat !== undefined && pickedLoc?.lng !== undefined
             ? { lat: pickedLoc.lat, lng: pickedLoc.lng }
             : undefined,
         customerName: guest ? name.trim() : undefined,
         customerPhone: guest ? phone.trim() : undefined,
         note,
+        payment: paymentMethod,
         items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity, selections: l.selections })),
       });
       setPlaced(true);
@@ -116,8 +121,12 @@ export default function Checkout() {
     }
   }
 
-  const guestReady = !!pickedLoc?.zoneId && !!pickedLoc?.address && phone.trim().length >= 6;
-  const deliveryFeePerOrder = guest ? pickedLoc?.deliveryFee : address?.deliveryFee;
+  // A confirmed map spot is ready once it has a zone and an address (guests also
+  // need a phone number they typed); otherwise a saved address is required.
+  const destinationReady = pickedLoc
+    ? !!pickedLoc.zoneId && !!pickedLoc.address && (!guest || phone.trim().length >= 6)
+    : !guest && !!address;
+  const deliveryFeePerOrder = pickedLoc ? pickedLoc.deliveryFee : address?.deliveryFee;
   const shopCount = shops.length;
   const deliveryFee =
     deliveryFeePerOrder !== undefined ? deliveryFeePerOrder * Math.max(1, shopCount) : undefined;
@@ -164,7 +173,7 @@ export default function Checkout() {
           <Button
             label={total !== undefined ? `تأكيد الطلب · ${formatPrice(total)}` : "تأكيد الطلب"}
             loading={placing}
-            disabled={(guest ? !guestReady : !address) || hasBlocking}
+            disabled={!destinationReady || hasBlocking}
             onPress={submit}
           />
         </>
@@ -252,96 +261,110 @@ export default function Checkout() {
             ) : null}
           </Pressable>
         ) : null}
-        {guest ? (
-          <>
-            <AppText variant="subtitle">التوصيل إلى</AppText>
-            {pickedLoc ? (
-              <View style={[styles.option, styles.locationCard]}>
-                <AppText variant="subtitle">📍 موقعك على الخريطة</AppText>
-                <AppText variant="caption" tone="muted" numberOfLines={2}>
-                  {pickedLoc.address ??
-                    (pickedLoc.lat !== undefined && pickedLoc.lng !== undefined
-                      ? `${pickedLoc.lat.toFixed(5)}, ${pickedLoc.lng.toFixed(5)}`
-                      : "")}
-                </AppText>
-                {pickedLoc.zoneName ? (
-                  <AppText variant="caption" tone="muted">
-                    {pickedLoc.zoneName} · توصيل {formatPrice(pickedLoc.deliveryFee ?? 0)}
-                  </AppText>
-                ) : null}
-                <Button kind="secondary" label="تغيير الموقع" onPress={openLocationPicker} />
-              </View>
-            ) : (
-              <Button kind="secondary" label="اختر موقعك على الخريطة" onPress={openLocationPicker} />
-            )}
+        <AppText variant="subtitle">التوصيل إلى</AppText>
 
-            <View style={styles.inputs}>
-              <TextField
-                label="الاسم"
-                placeholder="أدخل اسمك"
-                value={name}
-                onChangeText={setName}
-                autoComplete="name"
-              />
-              <TextField
-                label="رقم الجوال"
-                placeholder="01xxxxxxxxx"
-                keyboardType="phone-pad"
-                autoComplete="tel"
-                value={phone}
-                onChangeText={setPhone}
-              />
+        {/* A spot confirmed on the map. It wins over a saved address, and tapping
+            the card re-opens the map to change it. */}
+        {pickedLoc ? (
+          <Pressable
+            accessibilityRole="radio"
+            accessibilityState={{ selected: true }}
+            accessibilityLabel="الموقع المحدد على الخريطة"
+            onPress={openLocationPicker}
+            style={[styles.option, styles.addressOption, styles.optionOn]}>
+            <View style={[styles.radio, styles.radioOn]} />
+            <View style={styles.optionBody}>
+              <AppText variant="subtitle">📍 {pickedLoc.zoneName}</AppText>
+              <AppText variant="caption" tone="muted" numberOfLines={1}>
+                {pickedLoc.address}
+              </AppText>
             </View>
-          </>
-        ) : (
-          <>
-            <AppText variant="subtitle">التوصيل إلى</AppText>
-            {addresses?.map((a) => {
-              const selected = a._id === address?._id;
-              return (
-                <Pressable
-                  key={a._id}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected, disabled: !a.zoneActive }}
-                  disabled={!a.zoneActive}
-                  onPress={() => setChosenId(a._id)}
-                  style={[styles.option, styles.addressOption, selected && styles.optionOn]}>
-                  <View style={[styles.radio, selected && styles.radioOn]} />
-                  <View style={styles.optionBody}>
-                    <AppText variant="subtitle">
-                      {a.label} · {a.zoneName}
-                    </AppText>
-                    <AppText variant="caption" tone="muted">
-                      {a.street}
-                      {a.landmark ? ` · ${a.landmark}` : ""}
-                    </AppText>
-                  </View>
-                  <AppText variant="caption" tone={a.zoneActive ? "muted" : "danger"}>
-                    {a.zoneActive ? `توصيل ${formatPrice(a.deliveryFee)}` : "التوصيل متوقف هنا"}
-                  </AppText>
-                </Pressable>
-              );
-            })}
+            <AppText variant="subtitle" tone="primary" style={{ fontWeight: "700" }}>
+              تغيير
+            </AppText>
+          </Pressable>
+        ) : null}
 
-            {addresses !== undefined && deliverable.length === 0 ? (
-              <Button
-                kind="secondary"
-                label="اختر موقعك على الخريطة"
-                onPress={() => router.push({ pathname: "/select-location", params: { from: "/checkout" } })}
-              />
+        {addresses?.map((a) => {
+          // Saved addresses are only active while no map spot is pinned.
+          const selected = !pickedLoc && a._id === address?._id;
+          return (
+            <Pressable
+              key={a._id}
+              accessibilityRole="radio"
+              accessibilityState={{ selected, disabled: !a.zoneActive }}
+              disabled={!a.zoneActive}
+              onPress={() => {
+                setPicked(null);
+                setChosenId(a._id);
+              }}
+              style={[styles.option, styles.addressOption, selected && styles.optionOn]}>
+              <View style={[styles.radio, selected && styles.radioOn]} />
+            <View style={styles.optionBody}>
+              <AppText variant="subtitle">{a.zoneName}</AppText>
+              {a.street ? (
+                <AppText variant="caption" tone="muted" numberOfLines={1}>
+                  {a.street}
+                </AppText>
+              ) : null}
+              {a.landmark ? (
+                <AppText variant="caption" tone="muted" numberOfLines={1}>
+                  {a.landmark}
+                </AppText>
+              ) : null}
+            </View>
+              <AppText variant="caption" tone={a.zoneActive ? "muted" : "danger"}>
+                {a.zoneActive ? `توصيل ${formatPrice(a.deliveryFee)}` : "التوصيل متوقف هنا"}
+              </AppText>
+            </Pressable>
+          );
+        })}
 
-            ) : null}
-          </>
-        )}
+        {!pickedLoc ? (
+          <Button kind="secondary" label="اختر موقعك على الخريطة" onPress={openLocationPicker} />
+        ) : null}
+
+        {guest ? (
+          <View style={styles.inputs}>
+            <TextField
+              label="الاسم"
+              placeholder="أدخل اسمك"
+              value={name}
+              onChangeText={setName}
+              autoComplete="name"
+            />
+            <TextField
+              label="رقم الجوال"
+              placeholder="01xxxxxxxxx"
+              keyboardType="phone-pad"
+              autoComplete="tel"
+              value={phone}
+              onChangeText={setPhone}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.payment}>
           <AppText variant="subtitle">طريقة الدفع</AppText>
-          <View style={styles.option}>
-            <AppText variant="subtitle">💵 نقدًا عند الاستلام</AppText>
-            <AppText variant="caption" tone="muted">
-              ادفع للمندوب عند وصول الطلب.
-            </AppText>
-          </View>
+          {PAYMENT_METHODS.map((p) => (
+            <Pressable
+              key={p.value}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: paymentMethod === p.value }}
+              disabled={false}
+              onPress={() => setPaymentMethod(p.value)}
+              style={[styles.paymentOption, paymentMethod === p.value && styles.paymentOptionOn]}>
+              <View style={[styles.radio, paymentMethod === p.value && styles.radioOn]} />
+              <View style={styles.paymentOptionBody}>
+                <AppText variant="subtitle" style={p.value === "vfcash" ? { writingDirection: "ltr" } : undefined}>
+                  {p.label}
+                </AppText>
+                <AppText variant="caption" tone="muted" numberOfLines={1}>
+                  {p.detail}
+                </AppText>
+              </View>
+            </Pressable>
+          ))}
         </View>
 
         <TextField
@@ -359,6 +382,12 @@ export default function Checkout() {
   );
 }
 
+const PAYMENT_METHODS: { value: "cod" | "vfcash" | "instapay"; label: string; detail: string }[] = [
+  { value: "cod", label: "نقدًا عند الاستلام", detail: "ادفع للمندوب عند وصول الطلب." },
+  { value: "vfcash", label: "( 010 908 627 40 ) VF Cash", detail: "الدفع عبر تطبيق VF Cash." },
+  { value: "instapay", label: "InstaPay", detail: "الدفع عبر تطبيق InstaPay." },
+];
+
 const styles = StyleSheet.create({
   option: {
     gap: 2,
@@ -373,7 +402,18 @@ const styles = StyleSheet.create({
   optionBody: { flex: 1, gap: 2 },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.faint },
   radioOn: { borderColor: colors.primary, backgroundColor: colors.primary },
-  locationCard: { gap: space.sm },
+  paymentOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    padding: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  paymentOptionOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  paymentOptionBody: { gap: 1 },
   summaryHeader: {
     flexDirection: "row",
     alignItems: "center",
