@@ -1,13 +1,13 @@
+import { AppText } from "@/components/app-text";
+import { Button } from "@/components/button";
+import { Unavailable } from "@/components/unavailable";
+import { api } from "@/convex/_generated/api";
+import { orderCode } from "@/lib/order-code";
+import { colors, formatPrice, radius, space } from "@/theme";
 import { useQuery } from "convex/react";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Platform, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { api } from "@/convex/_generated/api";
-import { AppText } from "@/components/app-text";
-import { Button } from "@/components/button";
-import { Unavailable } from "@/components/unavailable";
-import { orderCode } from "@/lib/order-code";
-import { colors, formatPrice, radius, space } from "@/theme";
 
 export default function OrderSuccess() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -21,9 +21,9 @@ export default function OrderSuccess() {
       <View style={styles.badge}>
         <AppText style={styles.check}>✓</AppText>
       </View>
-      <AppText variant="display">تم إرسال طلبك بنجاح</AppText>
+      <AppText variant="display">سيتم تأكيد الأوردر خلال لحظات</AppText>
       <AppText tone="muted" style={styles.center}>
-        {order ? `تم استلام طلبك من ${order.shopName ?? ""}، وسيتم تأكيده في أقرب وقت.` : "..."}
+        {"تم استلام طلبك من " + (order?.shopName ?? "")}
       </AppText>
       {order ? (
         <View style={styles.card}>
@@ -37,7 +37,7 @@ export default function OrderSuccess() {
             ستدفع نقدًا عند الاستلام
           </AppText>
           <AppText variant="caption" tone="muted">
-            التوصيل إلى {order.address.label} · {order.address.zoneName}
+            التوصيل إلى موقع داخل {order.address.zoneName}
           </AppText>
         </View>
       ) : null}

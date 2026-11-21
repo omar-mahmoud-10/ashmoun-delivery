@@ -108,11 +108,13 @@ export default function SelectMap() {
       void reverseGeocode(next.lat, next.lng)
         .then((label) => {
           if (seq.current !== id) return;
-          setPlaceLabel(label);
+          // Never block the pick on a failed lookup — fall back to a generic
+          // label so the location is always saved and the customer can continue.
+          setPlaceLabel(label ?? `نقطة ${next.lat.toFixed(4)}, ${next.lng.toFixed(4)}`);
         })
         .catch(() => {
           if (seq.current !== id) return;
-          setPlaceLabel(null);
+          setPlaceLabel(`نقطة ${next.lat.toFixed(4)}, ${next.lng.toFixed(4)}`);
         })
         .finally(() => {
           if (seq.current === id) setGeocoding(false);
@@ -267,11 +269,9 @@ export default function SelectMap() {
     ? "حرّك الخريطة لتحديد الموقع"
     : geocoding
       ? "جارٍ تحديد اسم العنوان..."
-      : !hasAddress
-        ? "تعذر قراءة عنوان هذا الموقع، جرّب نقطة أخرى"
-        : matchedZone
-          ? `داخل منطقة التوصيل: ${matchedZone.name} ✓`
-          : "الموقع خارج مناطق التوصيل المتاحة";
+      : matchedZone
+        ? `داخل منطقة التوصيل: ${matchedZone.name} ✓`
+        : "الموقع خارج مناطق التوصيل المتاحة";
 
   return (
     <View style={styles.screen}>

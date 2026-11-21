@@ -101,6 +101,24 @@ export const setDriverActive = mutation({
   },
 });
 
+// Admin edits the note they'll relay to the shop and the rough ETA.
+export const setOrderNote = mutation({
+  args: { orderId: v.id("orders"), adminNote: v.string(), estimatedTime: v.string() },
+  handler: async (ctx, { orderId, adminNote, estimatedTime }) => {
+    await requireAdmin(ctx);
+    const order = await ctx.db.get(orderId);
+    if (order === null) throw new ConvexError("الطلب غير موجود");
+    const note = adminNote.trim();
+    const time = estimatedTime.trim();
+    if (note.length > 300) throw new ConvexError("يجب أن تكون الملاحظات أقل من 300 حرفًا");
+    if (time.length > 50) throw new ConvexError("الوقت التقريبي طويلة جدًا");
+    await ctx.db.patch(orderId, {
+      adminNote: note.length > 0 ? note : undefined,
+      estimatedTime: time.length > 0 ? time : undefined,
+    });
+  },
+});
+
 // Bootstrap: pnpm exec convex run admin:promote '{"phone":"01xxxxxxxxx"}'
 export const promote = internalMutation({
   args: { phone: v.string() },

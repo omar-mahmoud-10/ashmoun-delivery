@@ -112,3 +112,22 @@ export const add = mutation({
     await refreshShopStats(ctx, shopId);
   },
 });
+
+export const remove = mutation({
+  args: { shopId: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const shopId = ctx.db.normalizeId("shops", args.shopId);
+    if (shopId === null) throw new ConvexError("المحل غير موجود");
+
+    const review = await ctx.db
+      .query("reviews")
+      .withIndex("by_user_shop", (q) => q.eq("userId", user._id).eq("shopId", shopId))
+      .unique();
+    if (review === null) return { removed: 0 };
+
+    await ctx.db.delete(review._id);
+    await refreshShopStats(ctx, shopId);
+    return { removed: 1 };
+  },
+});

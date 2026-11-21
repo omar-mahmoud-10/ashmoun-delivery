@@ -68,6 +68,16 @@ export function ShopReviews({ shopId, rating, reviewsCount }: Props) {
   }
 
   const add = useMutation(api.reviews.add);
+  const remove = useMutation(api.reviews.remove);
+
+  const handleRemove = async () => {
+    setError("");
+    try {
+      await remove({ shopId });
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
 
   const submit = async () => {
     setError("");
@@ -89,16 +99,20 @@ export function ShopReviews({ shopId, rating, reviewsCount }: Props) {
     <View style={styles.section}>
       <View style={styles.headingRow}>
         <AppText variant="title">التقييمات</AppText>
-        {reviewsCount ? (
+        {reviewsCount && reviewsCount > 0 ? (
           <View style={styles.countPill}>
             <AppText variant="caption" tone="primaryInk">
               {reviewsCount}
             </AppText>
           </View>
-        ) : null}
+        ) : (
+          <AppText variant="caption" tone="muted" style={styles.noReviews}>
+            لا توجد تقييمات بعد
+          </AppText>
+        )}
       </View>
 
-      {rating != null && (
+      {rating != null && reviewsCount && reviewsCount > 0 && (
         <View style={styles.summary}>
           <AppText variant="subtitle">{rating.toFixed(1)}</AppText>
           <Stars rating={rating} size={16} />
@@ -139,12 +153,25 @@ export function ShopReviews({ shopId, rating, reviewsCount }: Props) {
             <Ionicons name="chevron-back" size={18} color={colors.primary} />
           </Pressable>
         ) : (
-          <Button
-            label={existing ? "تحديث تقييمي" : "إرسال التقييم"}
-            loading={saving}
-            disabled={starRating < 1 || saving}
-            onPress={submit}
-          />
+          <>
+            <Button
+              label={existing ? "تحديث تقييمي" : "إرسال التقييم"}
+              loading={saving}
+              disabled={starRating < 1 || saving}
+              onPress={submit}
+            />
+            {existing && (
+              <Pressable
+                style={styles.deleteButton}
+                onPress={handleRemove}
+                accessibilityLabel="احذف تقييمي"
+                disabled={saving}>
+                <AppText variant="caption" tone="danger">
+                  احذف تقييمي
+                </AppText>
+              </Pressable>
+            )}
+          </>
         )}
         {error ? (
           <AppText variant="caption" tone="danger">
@@ -224,6 +251,7 @@ const styles = StyleSheet.create({
   },
   listLoading: { marginVertical: space.md },
   empty: { textAlign: "center" },
+  noReviews: { color: colors.muted },
   review: {
     gap: space.xs,
     padding: space.md,
@@ -241,4 +269,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   reviewHeadBody: { flex: 1, gap: 2 },
+  deleteButton: { marginTop: space.xs, alignSelf: "flex-start" },
 });

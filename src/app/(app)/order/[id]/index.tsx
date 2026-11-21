@@ -15,7 +15,7 @@ import { orderCode } from "@/lib/order-code";
 import { colors, formatPrice, radius, space } from "@/theme";
 
 const statusHints: Record<OrderStatus, { text: string; color: string }> = {
-  created: { text: "بانتظار تأكيد الطلب", color: colors.warningInk },
+  created: { text: "بانتظار تأكيد الطلب من المطعم", color: colors.warningInk },
   confirmed: { text: "يقوم المحل بتجهيز طلبك", color: colors.primaryInk },
   with_driver: { text: "المندوب في الطريق إليك", color: colors.primaryInk },
   delivered: { text: "تم التوصيل، بالهناء والشفاء", color: colors.successInk },
@@ -104,6 +104,14 @@ export default function OrderTracking() {
       {order.note ? (
         <View style={styles.card}>
           <AppText variant="caption" tone="muted">ملاحظات: {order.note}</AppText>
+        </View>
+      ) : null}
+
+      {order.adminNote ? (
+        <View style={styles.card}>
+          <AppText variant="caption" tone="muted">
+            {order.estimatedTime ? `الوقت التقريبي: ${order.estimatedTime} · ` : ""}ملاحظة المندوب: {order.adminNote}
+          </AppText>
         </View>
       ) : null}
 

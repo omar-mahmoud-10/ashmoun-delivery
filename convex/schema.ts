@@ -161,6 +161,8 @@ export default defineSchema({
       }),
     ),
     note: v.string(),
+    adminNote: v.optional(v.string()),
+    estimatedTime: v.optional(v.string()),
     subtotal: v.number(),
     deliveryFee: v.number(),
     total: v.number(),

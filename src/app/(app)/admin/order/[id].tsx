@@ -11,6 +11,7 @@ import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
 import { OrderTimeline, StatusPill } from "@/components/order-status";
 import { PriceSummary } from "@/components/price-summary";
+import { TextField } from "@/components/text-field";
 import { Unavailable } from "@/components/unavailable";
 import { confirm } from "@/lib/confirm";
 import { errorMessage } from "@/lib/errors";
@@ -19,8 +20,8 @@ import { colors, formatPrice, radius, space } from "@/theme";
 
 const actionLabels: Record<OrderStatus, string> = {
   created: "",
-  confirmed: "تأكيد الطلب",
-  with_driver: "تسليم للمندوب",
+  confirmed: "[subroutine]",
+  with_driver: "alm delivery",
   delivered: "تم التسليم",
   returned: "مرتجع",
   cancelled: "إلغاء الطلب",
@@ -31,9 +32,14 @@ export default function AdminOrder() {
   const order = useQuery(api.admin.order, { orderId: id });
   const drivers = useQuery(api.admin.drivers);
   const setStatus = useMutation(api.admin.setStatus);
+  const setNote = useMutation(api.admin.setOrderNote);
   const [driverId, setDriverId] = useState<Id<"drivers"> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<OrderStatus | null>(null);
+  const [savingNote, setSavingNote] = useState(false);
+  const [adminNote, setAdminNote] = useState("");
+  const [estimatedTime, setEstimatedTime] = useState("");
+  const [prevSeed, setPrevSeed] = useState<string | null>(null);
   const wide = useWindowDimensions().width >= 900;
 
   if (order === undefined) return <ActivityIndicator style={styles.loading} color={colors.primary} />;
@@ -48,6 +54,15 @@ export default function AdminOrder() {
       : null;
   const forward = next.filter((s) => s !== "cancelled" && s !== "returned");
   const destructive = next.filter((s) => s === "cancelled" || s === "returned");
+
+  // Seed the admin note/ETA inputs from the order once it loads, then keep
+  // them in sync when the order changes (e.g. after a status transition).
+  const seedKey = `${order._id}|${order.adminNote ?? ""}|${order.estimatedTime ?? ""}`;
+  if (seedKey !== prevSeed) {
+    setPrevSeed(seedKey);
+    setAdminNote(order.adminNote ?? "");
+    setEstimatedTime(order.estimatedTime ?? "");
+  }
 
   async function move(status: OrderStatus) {
     if (!order) return;
@@ -67,6 +82,23 @@ export default function AdminOrder() {
       setError(errorMessage(e));
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function saveNote() {
+    if (!order) return;
+    setError(null);
+    setSavingNote(true);
+    try {
+      await setNote({
+        orderId: order._id,
+        adminNote,
+        estimatedTime,
+      });
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setSavingNote(false);
     }
   }
 
@@ -159,6 +191,35 @@ export default function AdminOrder() {
                 <AppText tone="warningInk">{order.note}</AppText>
               </View>
             ) : null}
+
+            <View style={styles.card}>
+              <AppText variant="subtitle">ملاحظة الأدمن للمحل</AppText>
+              <TextField
+                label="ملاحظة تُ relay للمحل"
+                placeholder="مثال: يرجى التأكيد عند التسليم"
+                multiline
+                value={adminNote}
+                onChangeText={setAdminNote}
+                maxLength={300}
+              />
+              <TextField
+                label="الوقت التقريبي"
+                placeholder="مثال: Within 30 minutes"
+                value={estimatedTime}
+                onChangeText={setEstimatedTime}
+                maxLength={50}
+              />
+              <Button
+                label="حفظ الملاحظة والوقت التقريبي"
+                loading={savingNote}
+                onPress={saveNote}
+              />
+              {order.adminNote || order.estimatedTime ? (
+                <AppText variant="caption" tone="muted">
+                  {order.estimatedTime ? `الوقت التقريبي: ${order.estimatedTime}` : ""}
+                </AppText>
+              ) : null}
+            </View>
 
             <View style={styles.card}>
               {order.items.map((item, index) => (

@@ -101,65 +101,69 @@ export default function Profile() {
         </View>
       )}
 
-      <View style={styles.sectionRow}>
-        <AppText variant="subtitle">عناويني</AppText>
-        <Pressable
-          accessibilityRole="button"
-          onPress={onAddAddress}
-          hitSlop={8}
-          style={styles.link}>
-          <AppText variant="caption" tone="primaryInk">
-            + أضف عنوان
-          </AppText>
-        </Pressable>
-      </View>
-      {sortedAddresses.map((address) => (
-        <View key={address._id} style={[styles.card, address.isDefault && styles.defaultCard]}>
+      {me !== null ? (
+        <>
           <View style={styles.sectionRow}>
-            <AppText variant="subtitle">
-              {address.zoneName}
-            </AppText>
-            {address.isDefault ? (
-              <View style={styles.defaultPill}>
-                <AppText variant="caption" style={styles.defaultPillText}>
-                  العنوان الأساسي
+            <AppText variant="subtitle">عناويني</AppText>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onAddAddress}
+              hitSlop={8}
+              style={styles.link}>
+              <AppText variant="caption" tone="primaryInk">
+                + أضف عنوان
+              </AppText>
+            </Pressable>
+          </View>
+          {sortedAddresses.map((address) => (
+            <View key={address._id} style={[styles.card, address.isDefault && styles.defaultCard]}>
+              <View style={styles.sectionRow}>
+                <AppText variant="subtitle">
+                  {address.zoneName}
                 </AppText>
+                {address.isDefault ? (
+                  <View style={styles.defaultPill}>
+                    <AppText variant="caption" style={styles.defaultPillText}>
+                      العنوان الأساسي
+                    </AppText>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
-          </View>
-          <AppText tone="muted">
-            {address.street}
-            {address.landmark ? ` · ${address.landmark}` : ""}
-          </AppText>
-          <AppText variant="caption" tone={address.zoneActive ? "muted" : "danger"}>
-            {address.zoneActive ? `توصيل ${formatPrice(address.deliveryFee)}` : "التوصيل متوقف في هذه المنطقة حاليًا"}
-          </AppText>
-          <View style={styles.actions}>
-            {address.isDefault ? null : (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => void run(() => setDefault({ addressId: address._id }))}
-                hitSlop={8}
-                style={styles.link}>
-                <AppText variant="caption" tone="primaryInk">
-                  تعيين كعنوان أساسي
-                </AppText>
-              </Pressable>
-            )}
-            {sortedAddresses.length > 1 ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => void onRemove(address._id, address.label)}
-                hitSlop={8}
-                style={[styles.link, styles.remove]}>
-                <AppText variant="caption" tone="danger">
-                  حذف
-                </AppText>
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
-      ))}
+              <AppText tone="muted">
+                {address.street}
+                {address.landmark ? ` · ${address.landmark}` : ""}
+              </AppText>
+              <AppText variant="caption" tone={address.zoneActive ? "muted" : "danger"}>
+                {address.zoneActive ? `توصيل ${formatPrice(address.deliveryFee)}` : "التوصيل متوقف في هذه المنطقة حاليًا"}
+              </AppText>
+              <View style={styles.actions}>
+                {address.isDefault ? null : (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => void run(() => setDefault({ addressId: address._id }))}
+                    hitSlop={8}
+                    style={styles.link}>
+                    <AppText variant="caption" tone="primaryInk">
+                      تعيين كعنوان أساسي
+                    </AppText>
+                  </Pressable>
+                )}
+                {sortedAddresses.length > 1 ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => void onRemove(address._id, address.label)}
+                    hitSlop={8}
+                    style={[styles.link, styles.remove]}>
+                    <AppText variant="caption" tone="danger">
+                      حذف
+                    </AppText>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </>
+      ) : null}
       {error ? <AppText tone="danger">{error}</AppText> : null}
       {me?.isAdmin ? <Button kind="secondary" label="🛠️ لوحة التحكم" onPress={() => router.push("/admin")} /> : null}
       {me !== null && me !== undefined ? (

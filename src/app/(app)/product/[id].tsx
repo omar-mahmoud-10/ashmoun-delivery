@@ -1,21 +1,21 @@
+import { AppText } from "@/components/app-text";
+import { Button } from "@/components/button";
+import { CartHeaderButton } from "@/components/cart-header-button";
+import { EmojiTile } from "@/components/emoji-tile";
+import { todayHoursLabel } from "@/components/shop-status";
+import { StepButton } from "@/components/step-button";
+import { Unavailable } from "@/components/unavailable";
+import { api } from "@/convex/_generated/api";
+import { isShopOpen } from "@/convex/lib/hours";
+import { MAX_QUANTITY, priceLine } from "@/convex/lib/pricing";
+import { useCart } from "@/lib/cart";
+import { useNow } from "@/lib/use-now";
+import { colors, formatPrice, radius, space } from "@/theme";
 import { useQuery } from "convex/react";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { api } from "@/convex/_generated/api";
-import { isShopOpen } from "@/convex/lib/hours";
-import { MAX_QUANTITY, priceLine } from "@/convex/lib/pricing";
-import { AppText } from "@/components/app-text";
-import { Button } from "@/components/button";
-import { CartHeaderButton } from "@/components/cart-header-button";
-import { EmojiTile } from "@/components/emoji-tile";
-import { StepButton } from "@/components/step-button";
-import { todayHoursLabel } from "@/components/shop-status";
-import { Unavailable } from "@/components/unavailable";
-import { useCart } from "@/lib/cart";
-import { useNow } from "@/lib/use-now";
-import { colors, formatPrice, radius, space } from "@/theme";
 
 type Selected = Record<string, string[]>;
 
@@ -125,7 +125,11 @@ export default function Product() {
             disabled={priced.kind !== "ok"}
             label={
               priced.kind === "ok"
-                ? `${narrow ? "أضف" : "أضف إلى السلة"} · ${formatPrice(priced.unitPrice * quantity)}`
+                ? (() => {
+                    const total = priced.unitPrice * quantity;
+                    const totalStr = Number.isInteger(total) ? String(total) : total.toString();
+                    return `${narrow ? "أضف" : "أضف إلى السلة"} ( ${totalStr} ج )`;
+                  })()
                 : "اختر المطلوب"
             }
             onPress={addToCart}

@@ -40,6 +40,12 @@ export default function Checkout() {
   const [error, setError] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    const unsub = useCart.persist.onFinishHydration(() => setHydrated(true));
+    if (useCart.persist.hasHydrated()) setHydrated(true);
+    return () => { unsub(); };
+  }, []);
   // Read the pick straight from the store instead of copying it into local state:
   // the map confirms by writing the store and navigating back in the same tick, so
   // a focus-effect copy could run before the new value was rendered and drop it.
@@ -77,10 +83,10 @@ export default function Checkout() {
     quote?.kind === "ok" ? quote.shops.reduce((sum, s) => sum + s.subtotal, 0) : cartSubtotal(lines);
 
   useEffect(() => {
-    if (!placed && lines.length === 0) {
+    if (!placed && hydrated && lines.length === 0) {
       router.replace("/");
     }
-  }, [placed, lines.length]);
+  }, [placed, hydrated, lines.length]);
 
   async function submit() {
     if (lines.length === 0 || placing) return;
@@ -129,7 +135,7 @@ export default function Checkout() {
   const deliveryFeePerOrder = pickedLoc ? pickedLoc.deliveryFee : address?.deliveryFee;
   const shopCount = shops.length;
   const deliveryFee =
-    deliveryFeePerOrder !== undefined ? deliveryFeePerOrder * Math.max(1, shopCount) : undefined;
+    deliveryFeePerOrder !== undefined ? deliveryFeePerOrder + 5 * Math.max(0, shopCount - 1) : undefined;
   const total = subtotal !== undefined && deliveryFee !== undefined ? subtotal + deliveryFee : undefined;
 
   const grouped = useMemo(() => {
@@ -192,10 +198,10 @@ export default function Checkout() {
               </AppText>
             </View>
             <View style={styles.showRow}>
-              <AppText variant="caption" tone="primary">
+              <AppText variant="caption" tone="primary" style={styles.showItemsText}>
                 {showItems ? "إخفِ المنتجات" : "اعرض المنتجات"}
               </AppText>
-              <AppText style={styles.chevron}>{showItems ? "▴" : "▾"}</AppText>
+              <AppText style={[styles.chevron, styles.showItemsChevron]}>{showItems ? "▴" : "▾"}</AppText>
             </View>
             {showItems ? (
               <View style={styles.itemsList}>
@@ -274,18 +280,20 @@ export default function Checkout() {
             style={[styles.option, styles.addressOption, styles.optionOn]}>
             <View style={[styles.radio, styles.radioOn]} />
             <View style={styles.optionBody}>
-              <AppText variant="subtitle">📍 {pickedLoc.zoneName}</AppText>
-              <AppText variant="caption" tone="muted" numberOfLines={1}>
-                {pickedLoc.address}
+              <AppText variant="caption" tone="primary" style={styles.zoneTop}>
+                📍 {pickedLoc?.zoneName} · {formatPrice(pickedLoc.deliveryFee ?? 0)}
+              </AppText>
+              <AppText variant="body" style={styles.streetLine} numberOfLines={1}>
+                {pickedLoc?.address}
               </AppText>
             </View>
-            <AppText variant="subtitle" tone="primary" style={{ fontWeight: "700" }}>
+            <AppText variant="subtitle" tone="primary" style={{ fontWeight: "900" }}>
               تغيير
             </AppText>
           </Pressable>
         ) : null}
 
-        {addresses?.map((a) => {
+        {!pickedLoc && addresses?.map((a) => {
           // Saved addresses are only active while no map spot is pinned.
           const selected = !pickedLoc && a._id === address?._id;
           return (
@@ -301,27 +309,21 @@ export default function Checkout() {
               style={[styles.option, styles.addressOption, selected && styles.optionOn]}>
               <View style={[styles.radio, selected && styles.radioOn]} />
             <View style={styles.optionBody}>
-              <AppText variant="subtitle">{a.zoneName}</AppText>
+              <AppText variant="caption" tone={a.zoneActive ? "primary" : "danger"} style={styles.zoneTop}>
+                📍 {a.zoneName} · {a.zoneActive ? formatPrice(a.deliveryFee) : "التوصيل متوقف هنا"}
+              </AppText>
               {a.street ? (
-                <AppText variant="caption" tone="muted" numberOfLines={1}>
+                <AppText variant="body" style={styles.streetLine} numberOfLines={1}>
                   {a.street}
                 </AppText>
               ) : null}
-              {a.landmark ? (
-                <AppText variant="caption" tone="muted" numberOfLines={1}>
-                  {a.landmark}
-                </AppText>
-              ) : null}
             </View>
-              <AppText variant="caption" tone={a.zoneActive ? "muted" : "danger"}>
-                {a.zoneActive ? `توصيل ${formatPrice(a.deliveryFee)}` : "التوصيل متوقف هنا"}
-              </AppText>
             </Pressable>
           );
         })}
 
         {!pickedLoc ? (
-          <Button kind="secondary" label="اختر موقعك على الخريطة" onPress={openLocationPicker} />
+          <Button kind="secondary" label="اختر موقعك على الخريطة" onPress={openLocationPicker} style={styles.chooseLocationBtn} />
         ) : null}
 
         {guest ? (
@@ -356,7 +358,7 @@ export default function Checkout() {
               style={[styles.paymentOption, paymentMethod === p.value && styles.paymentOptionOn]}>
               <View style={[styles.radio, paymentMethod === p.value && styles.radioOn]} />
               <View style={styles.paymentOptionBody}>
-                <AppText variant="subtitle" style={p.value === "vfcash" ? { writingDirection: "ltr" } : undefined}>
+                <AppText variant="subtitle" style={p.value !== "cod" ? { writingDirection: "ltr" } : undefined}>
                   {p.label}
                 </AppText>
                 <AppText variant="caption" tone="muted" numberOfLines={1}>
@@ -385,7 +387,7 @@ export default function Checkout() {
 const PAYMENT_METHODS: { value: "cod" | "vfcash" | "instapay"; label: string; detail: string }[] = [
   { value: "cod", label: "نقدًا عند الاستلام", detail: "ادفع للمندوب عند وصول الطلب." },
   { value: "vfcash", label: "( 010 908 627 40 ) VF Cash", detail: "الدفع عبر تطبيق VF Cash." },
-  { value: "instapay", label: "InstaPay", detail: "الدفع عبر تطبيق InstaPay." },
+  { value: "instapay", label: "( omar.mahmoud.26 ) InstaPay", detail: "الدفع عبر تطبيق InstaPay." },
 ];
 
 const styles = StyleSheet.create({
@@ -427,6 +429,8 @@ const styles = StyleSheet.create({
     marginTop: space.xs,
   },
   chevron: { fontSize: 12, color: colors.primary },
+  showItemsText: { fontSize: 15, fontWeight: "600" },
+  showItemsChevron: { fontSize: 16 },
   itemsList: {
     marginTop: space.sm,
     paddingTop: space.sm,
@@ -454,4 +458,7 @@ const styles = StyleSheet.create({
   qtyText: { fontSize: 14, fontWeight: "700", color: colors.ink, minWidth: 20, textAlign: "center" },
   inputs: { gap: space.sm },
   payment: { paddingTop: space.lg },
+  zoneTop: { fontWeight: "700", fontSize: 18, marginBottom: 2 },
+  streetLine: { fontSize: 13, fontWeight: "400", color: colors.ink },
+  chooseLocationBtn: { marginTop: space.md },
 });

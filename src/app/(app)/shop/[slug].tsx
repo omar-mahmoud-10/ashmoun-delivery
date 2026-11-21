@@ -1,5 +1,6 @@
 import { AppText } from "@/components/app-text";
 import { CartHeaderButton } from "@/components/cart-header-button";
+import { CartTour } from "@/components/cart-tour";
 import { EmojiTile } from "@/components/emoji-tile";
 import { ShopReviews } from "@/components/shop-reviews";
 import { shopState, ShopStatusBadge, todayHoursLabel } from "@/components/shop-status";
@@ -58,6 +59,7 @@ export default function Shop() {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [addedItem, setAddedItem] = useState<string | null>(null);
+  const [tourVisible, setTourVisible] = useState(false);
 
   const toggleCategory = useCallback((id: string) => {
     setExpanded((prev) => {
@@ -170,6 +172,7 @@ export default function Shop() {
   }, [data, q]);
 
   const addedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tourShownRef = useRef(false);
 
   useEffect(
     () => () => {
@@ -198,6 +201,10 @@ export default function Shop() {
         },
       );
       setAddedItem(item.name);
+      if (!tourShownRef.current) {
+        tourShownRef.current = true;
+        setTourVisible(true);
+      }
       if (addedTimeout.current) clearTimeout(addedTimeout.current);
       addedTimeout.current = setTimeout(() => setAddedItem(null), 2000);
     },
@@ -427,9 +434,14 @@ export default function Shop() {
                 · {todayHoursLabel(shop, now)}
               </AppText>
             </View>
-            {shop.rating != null && (
+            {shop.rating != null && shop.reviewsCount && shop.reviewsCount > 0 && (
               <AppText variant="caption" tone="primaryInk" style={styles.shopRating}>
                 {shop.rating.toFixed(1)} ({shop.reviewsCount ?? 0} تقييم)
+              </AppText>
+            )}
+            {!shop.reviewsCount && (
+              <AppText variant="caption" tone="muted" style={styles.shopRating}>
+                لا توجد تقييمات بعد
               </AppText>
             )}
           </View>
@@ -491,6 +503,7 @@ export default function Shop() {
         )}
         <View style={styles.bottomSpacer} />
       </ScrollView>
+      <CartTour visible={tourVisible} onDismiss={() => setTourVisible(false)} />
     </>
   );
 }
