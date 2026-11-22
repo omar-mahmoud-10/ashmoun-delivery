@@ -34,10 +34,14 @@ export default function OrderSuccess() {
             {formatPrice(order.total)}
           </AppText>
           <AppText variant="caption" tone="muted">
-            ستدفع نقدًا عند الاستلام
+            {order.fulfillment === "pickup" ? "الدفع نقدًا عند الاستلام من الفرع" : "ستدفع نقدًا عند الاستلام"}
           </AppText>
           <AppText variant="caption" tone="muted">
-            التوصيل إلى موقع داخل {order.address.zoneName}
+            {order.fulfillment === "pickup"
+              ? `الاستلام من فرع ${order.shopName}`
+              : order.address
+                ? `التوصيل إلى موقع داخل ${order.address.zoneName}`
+                : ""}
           </AppText>
         </View>
       ) : null}

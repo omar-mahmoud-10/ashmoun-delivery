@@ -81,6 +81,9 @@ export const quote = query({
 
 export const place = mutation({
   args: {
+    // "delivery" orders go to a saved address or a pinned map spot; "pickup"
+    // orders are collected by the customer at the shop's branch.
+    fulfillment: v.optional(v.union(v.literal("delivery"), v.literal("pickup"))),
     // Logged-in customers order to a saved address; guests order to a picked
     // location with a typed street, a chosen zone, and contact info.
     addressId: v.optional(v.id("addresses")),
@@ -98,8 +101,12 @@ export const place = mutation({
     const userId = await getAuthUserId(ctx);
     const user = userId === null ? null : await ctx.db.get(userId);
 
+    const fulfillment = args.fulfillment ?? "delivery";
+
     let zone, label, street, landmark, location;
-    if (user && args.addressId) {
+    if (fulfillment === "pickup") {
+      // No destination: the customer collects the order at the shop's branch.
+    } else if (user && args.addressId) {
       // A saved address wins when the customer picked one from their list.
       const address = await ctx.db.get(args.addressId);
       if (address === null || address.userId !== user._id) throw new ConvexError("العنوان غير موجود");
@@ -118,7 +125,8 @@ export const place = mutation({
       if (street.length < 1) throw new ConvexError("يرجى كتابة العنوان");
       location = args.location;
     }
-    if (zone === null || !zone.active) throw new ConvexError("التوصيل متوقف في هذه المنطقة حاليًا");
+    if (fulfillment !== "pickup" && (zone === null || zone === undefined || !zone.active))
+      throw new ConvexError("التوصيل متوقف في هذه المنطقة حاليًا");
 
     const customerName = (args.customerName ?? user?.name ?? "").trim();
     const customerPhone = (args.customerPhone ?? user?.phone ?? "").trim();
@@ -148,24 +156,29 @@ export const place = mutation({
       if (!isShopOpen(shop, now)) throw new ConvexError(`${shop.name}: المحل مغلق حاليًا`);
       const { items, subtotal } = await priceShopCart(ctx, shop, lines);
       if (subtotal < (shop.minOrder ?? 0)) throw new ConvexError(`الحد الأدنى للطلب من ${shop.name} هو ${shop.minOrder ?? 0} ج.م`);
+      const deliveryFee = fulfillment === "pickup" ? 0 : (zone?.deliveryFee ?? 0);
       const orderId = await ctx.db.insert("orders", {
         userId: user?._id,
         shopId: shop._id,
         shopName: shop.name,
-        address: {
-          zoneName: zone.name,
-          label: label ?? "موقع الطلب",
-          street,
-          landmark: landmark ?? (args.landmark ?? "").trim(),
-          location: user ? location : args.location,
-        },
+        fulfillment,
+        address:
+          fulfillment === "pickup"
+            ? undefined
+            : {
+                zoneName: zone?.name ?? "",
+                label: label ?? "موقع الطلب",
+                street: street ?? "",
+                landmark: landmark ?? (args.landmark ?? "").trim(),
+                location: user ? location : args.location,
+              },
         customerName,
         customerPhone,
         items,
         note,
         subtotal,
-        deliveryFee: zone.deliveryFee,
-        total: subtotal + zone.deliveryFee,
+        deliveryFee,
+        total: subtotal + deliveryFee,
         payment: args.payment,
         status: "created",
         history: [{ status: "created", at: now, by: user?._id }],

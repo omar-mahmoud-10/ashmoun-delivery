@@ -54,7 +54,7 @@ export const setStatus = mutation({
     const admin = await requireAdmin(ctx);
     const order = await ctx.db.get(orderId);
     if (order === null) throw new ConvexError("الطلب غير موجود");
-    if (!canTransition(order.status, status)) throw new ConvexError("لا يمكن نقل الطلب إلى هذه الحالة");
+    if (!canTransition(order.status, status, order.fulfillment ?? "delivery")) throw new ConvexError("لا يمكن نقل الطلب إلى هذه الحالة");
 
     let driver = order.driver;
     if (status === "with_driver") {

@@ -1,6 +1,4 @@
 import { AppText } from "@/components/app-text";
-import { CartHeaderButton } from "@/components/cart-header-button";
-import { CartTour } from "@/components/cart-tour";
 import { EmojiTile } from "@/components/emoji-tile";
 import { ShopReviews } from "@/components/shop-reviews";
 import { shopState, ShopStatusBadge, todayHoursLabel } from "@/components/shop-status";
@@ -54,12 +52,17 @@ export default function Shop() {
   const now = useNow();
   const cart = useCart();
   const data = useQuery(api.catalog.shopBySlug, { slug });
+  const shopReviews = useQuery(api.reviews.list, { shopId: data?.shop?._id ?? "" });
+
+  const reviewList = shopReviews ?? [];
+  const reviewCount = reviewList.length;
+  const reviewRating =
+    reviewCount > 0 ? reviewList.reduce((sum, r) => sum + r.rating, 0) / reviewCount : undefined;
 
   const [tab, setTab] = useState<TabKey>("menu");
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [addedItem, setAddedItem] = useState<string | null>(null);
-  const [tourVisible, setTourVisible] = useState(false);
 
   const toggleCategory = useCallback((id: string) => {
     setExpanded((prev) => {
@@ -172,7 +175,6 @@ export default function Shop() {
   }, [data, q]);
 
   const addedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tourShownRef = useRef(false);
 
   useEffect(
     () => () => {
@@ -182,10 +184,20 @@ export default function Shop() {
   );
 
   const addToCart = useCallback(
-    (shopId: Id<"shops">, shopName: string, item: Product) => {
+    (shopId: Id<"shops">, shopName: string, item: Product, shop: { hours: any; paused: boolean }) => {
       const hasRequired = item.optionGroups.some((g) => g.min > 0);
       if (hasRequired || !item.available) {
         router.push({ pathname: "/product/[id]", params: { id: item._id } });
+        return;
+      }
+      const state = shopState(shop, Date.now());
+      if (state !== "open") {
+        Alert.alert(
+          "المحل مغلق",
+          state === "paused"
+            ? "المحل متوقف عن استقبال الطلبات مؤقتًا"
+            : "المحل مغلق حاليًا، لا يمكن إضافة أصناف إلى السلة",
+        );
         return;
       }
       cart.add(
@@ -201,10 +213,6 @@ export default function Shop() {
         },
       );
       setAddedItem(item.name);
-      if (!tourShownRef.current) {
-        tourShownRef.current = true;
-        setTourVisible(true);
-      }
       if (addedTimeout.current) clearTimeout(addedTimeout.current);
       addedTimeout.current = setTimeout(() => setAddedItem(null), 2000);
     },
@@ -260,7 +268,7 @@ export default function Shop() {
             disabled={!item.available}
             onPress={(e) => {
               e.stopPropagation();
-              addToCart(shop._id, shop.name, item);
+              addToCart(shop._id, shop.name, item, shop);
             }}>
             <AppText variant="subtitle" tone="onPrimary" style={styles.addIcon}>
               +
@@ -411,7 +419,6 @@ export default function Shop() {
           headerStyle: { backgroundColor: colors.background },
           headerTintColor: colors.ink,
           headerTitleStyle: { fontFamily: fonts.bold, color: colors.ink },
-          headerRight: () => <CartHeaderButton />,
         }}
       />
       <ScrollView
@@ -434,12 +441,12 @@ export default function Shop() {
                 · {todayHoursLabel(shop, now)}
               </AppText>
             </View>
-            {shop.rating != null && shop.reviewsCount && shop.reviewsCount > 0 && (
+            {reviewRating != null && reviewCount > 0 && (
               <AppText variant="caption" tone="primaryInk" style={styles.shopRating}>
-                {shop.rating.toFixed(1)} ({shop.reviewsCount ?? 0} تقييم)
+                {reviewRating.toFixed(1)} ({reviewCount} تقييم)
               </AppText>
             )}
-            {!shop.reviewsCount && (
+            {!reviewCount && (
               <AppText variant="caption" tone="muted" style={styles.shopRating}>
                 لا توجد تقييمات بعد
               </AppText>
@@ -491,7 +498,7 @@ export default function Shop() {
             ? renderMenu()
             : tab === "reviews"
               ? (
-          <ShopReviews shopId={shop._id} rating={shop.rating} reviewsCount={shop.reviewsCount} />
+          <ShopReviews shopId={shop._id} />
       ) : (
           renderInfo()
         )}
@@ -503,7 +510,6 @@ export default function Shop() {
         )}
         <View style={styles.bottomSpacer} />
       </ScrollView>
-      <CartTour visible={tourVisible} onDismiss={() => setTourVisible(false)} />
     </>
   );
 }

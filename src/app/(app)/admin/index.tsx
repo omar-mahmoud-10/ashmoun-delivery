@@ -53,7 +53,7 @@ export default function AdminOrders() {
                 <StatusPill status={order.status} />
               </View>
               <AppText variant="caption" tone="muted">
-                {order.customerName} · {order.address.zoneName} · {timeFormat.format(order._creationTime)}
+                {order.customerName} · {order.fulfillment === "pickup" ? "استلام من الفرع" : order.address?.zoneName} · {timeFormat.format(order._creationTime)}
               </AppText>
               <AppText variant="subtitle" tone="primary">
                 {formatPrice(order.total)}

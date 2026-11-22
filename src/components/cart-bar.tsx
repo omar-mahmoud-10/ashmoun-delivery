@@ -1,4 +1,4 @@
-﻿import Ionicons from "@expo/vector-icons/Ionicons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, usePathname } from "expo-router";
 import { useEffect, useState } from "react";
 import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
@@ -8,8 +8,6 @@ import { colors, space } from "@/theme";
 import { AppText } from "./app-text";
 
 const HIDDEN_PATHS = ["/checkout", "/select-map"];
-// Store screens render their own cart button in the header.
-const HEADER_CART_PREFIXES = ["/shop", "/product"];
 // Order screens (just-placed success, tracking) must not have a floating cart over them,
 // so the cart is out of the way the moment an order is confirmed.
 const HIDDEN_PREFIXES = ["/order/"];
@@ -23,7 +21,10 @@ export function CartBar() {
   const [pulse] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
-    if (lines.length === 0) return;
+    const isHidden =
+      HIDDEN_PATHS.includes(pathname) ||
+      HIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+    if (lines.length === 0 || isHidden) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1.12, duration: 450, useNativeDriver: USE_NATIVE_DRIVER }),
@@ -32,13 +33,12 @@ export function CartBar() {
     );
     loop.start();
     return () => loop.stop();
-  }, [lines.length, pulse]);
+  }, [lines.length, pulse, pathname]);
 
   if (
     lines.length === 0 ||
     HIDDEN_PATHS.includes(pathname) ||
-    HIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ||
-    HEADER_CART_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+    HIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix))
   ) {
     return null;
   }

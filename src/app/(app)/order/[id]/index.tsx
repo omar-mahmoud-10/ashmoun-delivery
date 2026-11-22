@@ -33,6 +33,10 @@ export default function OrderTracking() {
   if (order === undefined) return <ActivityIndicator style={styles.loading} color={colors.primary} />;
   if (order === null) return <Unavailable message="هذا الطلب غير موجود" />;
 
+  const isPickup = order.fulfillment === "pickup";
+  const hint = statusHints[order.status];
+  const statusText = isPickup && order.status === "delivered" ? "تم استلام طلبك، بالهناء والشفاء" : hint.text;
+
   async function onCancel() {
     if (!order) return;
     const sure = await confirm({
@@ -57,13 +61,13 @@ export default function OrderTracking() {
       <Stack.Screen options={{ title: `طلب ${orderCode(order._id)}` }} />
       <View style={styles.card}>
         <AppText variant="title" numberOfLines={2}>{order.shopName}</AppText>
-        <AppText variant="subtitle" style={{ color: statusHints[order.status].color }}>
-          {statusHints[order.status].text}
+        <AppText variant="subtitle" style={{ color: hint.color }}>
+          {statusText}
         </AppText>
         <OrderTimeline order={order} />
       </View>
 
-      {order.driver && order.status === "with_driver" ? (
+      {!isPickup && order.driver && order.status === "with_driver" ? (
         <View style={styles.card}>
           <AppText variant="caption" tone="muted">
             المندوب
@@ -116,19 +120,28 @@ export default function OrderTracking() {
       ) : null}
 
       <View style={styles.card}>
+        {isPickup ? (
+          <>
+            <AppText variant="caption" tone="muted">🏪 استلام من الفرع</AppText>
+            <AppText>{order.shopName}</AppText>
+          </>
+        ) : (
+          <>
+            <AppText variant="caption" tone="muted">
+              التوصيل إلى {order.address?.label} · {order.address?.zoneName}
+            </AppText>
+            <AppText>
+              {order.address?.street}
+              {order.address?.landmark ? ` · ${order.address.landmark}` : ""}
+            </AppText>
+          </>
+        )}
         <AppText variant="caption" tone="muted">
-          التوصيل إلى {order.address.label} · {order.address.zoneName}
-        </AppText>
-        <AppText>
-          {order.address.street}
-          {order.address.landmark ? ` · ${order.address.landmark}` : ""}
-        </AppText>
-        <AppText variant="caption" tone="muted">
-          💵 الدفع نقدًا عند الاستلام
+          {isPickup ? "💵 الدفع نقدًا عند الاستلام من الفرع" : "💵 الدفع نقدًا عند الاستلام"}
         </AppText>
       </View>
 
-      <PriceSummary subtotal={order.subtotal} deliveryFee={order.deliveryFee} />
+      <PriceSummary subtotal={order.subtotal} deliveryFee={order.deliveryFee} pickup={isPickup} />
 
       {/* Guests have no account to attach a cancellation to; contact support instead. */}
       {order.userId && canCustomerCancel(order.status) ? (

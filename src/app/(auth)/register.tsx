@@ -1,6 +1,7 @@
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useConvexAuth } from "convex/react";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { normalizePhone } from "@/convex/lib/phone";
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
@@ -10,11 +11,17 @@ import { errorMessage } from "@/lib/errors";
 
 export default function Register() {
   const { signIn } = useAuthActions();
+  const { isAuthenticated } = useConvexAuth();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const authReadyRef = useRef(isAuthenticated);
+
+  useEffect(() => {
+    authReadyRef.current = isAuthenticated;
+  }, [isAuthenticated]);
 
   async function submit() {
     const normalized = normalizePhone(phone);
@@ -23,7 +30,13 @@ export default function Register() {
     setSubmitting(true);
     try {
       await signIn("password", { flow: "signUp", name: name.trim(), phone: normalized, password });
-      // Registered (and signed in): land on the home tabs.
+      // Wait for Convex to confirm the auth token with the server before
+      // navigating. Otherwise the `me` query on the profile page goes out
+      // unauthenticated and returns null, showing login buttons instead of
+      // account data.
+      while (!authReadyRef.current) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
       router.replace("/");
     } catch (e) {
       setError(errorMessage(e, "هذا الرقم مسجّل مسبقًا، جرّب تسجيل الدخول"));

@@ -37,6 +37,7 @@ export default function Checkout() {
   const setPhone = useGuest((s) => s.setPhone);
   const [note, setNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "vfcash" | "instapay">("cod");
+  const [fulfillment, setFulfillment] = useState<"delivery" | "pickup">("delivery");
   const [error, setError] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState(false);
@@ -90,19 +91,25 @@ export default function Checkout() {
 
   async function submit() {
     if (lines.length === 0 || placing) return;
-    // A spot confirmed on the map is the destination; otherwise a saved address is.
-    const pin = pickedLoc !== null;
-    if (pin && (!pickedLoc.zoneId || !pickedLoc.address)) return;
-    if (guest ? !pin || phone.trim().length < 6 : !pin && !address) return;
+    if (fulfillment === "delivery") {
+      // A spot confirmed on the map is the destination; otherwise a saved address is.
+      const pin = pickedLoc !== null;
+      if (pin && (!pickedLoc.zoneId || !pickedLoc.address)) return;
+      if (guest ? !pin || phone.trim().length < 6 : !pin && !address) return;
+    } else if (guest && phone.trim().length < 6) {
+      return;
+    }
     setError(null);
     setPlacing(true);
     try {
+      const pin = pickedLoc !== null;
       const res = await place({
-        addressId: pin || guest ? undefined : address?._id,
-        zoneId: pin || guest ? pickedLoc?.zoneId : undefined,
-        street: pin || guest ? (pickedLoc?.address ?? "") : undefined,
+        fulfillment,
+        addressId: fulfillment === "delivery" && !pin && !guest ? address?._id : undefined,
+        zoneId: fulfillment === "delivery" && (pin || guest) ? pickedLoc?.zoneId : undefined,
+        street: fulfillment === "delivery" && (pin || guest) ? (pickedLoc?.address ?? "") : undefined,
         location:
-          pin && pickedLoc?.lat !== undefined && pickedLoc?.lng !== undefined
+          fulfillment === "delivery" && pin && pickedLoc?.lat !== undefined && pickedLoc?.lng !== undefined
             ? { lat: pickedLoc.lat, lng: pickedLoc.lng }
             : undefined,
         customerName: guest ? name.trim() : undefined,
@@ -129,13 +136,20 @@ export default function Checkout() {
 
   // A confirmed map spot is ready once it has a zone and an address (guests also
   // need a phone number they typed); otherwise a saved address is required.
-  const destinationReady = pickedLoc
-    ? !!pickedLoc.zoneId && !!pickedLoc.address && (!guest || phone.trim().length >= 6)
-    : !guest && !!address;
+  const destinationReady =
+    fulfillment === "pickup"
+      ? !guest || phone.trim().length >= 6
+      : pickedLoc
+        ? !!pickedLoc.zoneId && !!pickedLoc.address && (!guest || phone.trim().length >= 6)
+        : !guest && !!address;
   const deliveryFeePerOrder = pickedLoc ? pickedLoc.deliveryFee : address?.deliveryFee;
   const shopCount = shops.length;
   const deliveryFee =
-    deliveryFeePerOrder !== undefined ? deliveryFeePerOrder + 5 * Math.max(0, shopCount - 1) : undefined;
+    fulfillment === "pickup"
+      ? 0
+      : deliveryFeePerOrder !== undefined
+        ? deliveryFeePerOrder + 5 * Math.max(0, shopCount - 1)
+        : undefined;
   const total = subtotal !== undefined && deliveryFee !== undefined ? subtotal + deliveryFee : undefined;
 
   const grouped = useMemo(() => {
@@ -267,64 +281,87 @@ export default function Checkout() {
             ) : null}
           </Pressable>
         ) : null}
-        <AppText variant="subtitle">التوصيل إلى</AppText>
-
-        {/* A spot confirmed on the map. It wins over a saved address, and tapping
-            the card re-opens the map to change it. */}
-        {pickedLoc ? (
-          <Pressable
-            accessibilityRole="radio"
-            accessibilityState={{ selected: true }}
-            accessibilityLabel="الموقع المحدد على الخريطة"
-            onPress={openLocationPicker}
-            style={[styles.option, styles.addressOption, styles.optionOn]}>
-            <View style={[styles.radio, styles.radioOn]} />
-            <View style={styles.optionBody}>
-              <AppText variant="caption" tone="primary" style={styles.zoneTop}>
-                📍 {pickedLoc?.zoneName} · {formatPrice(pickedLoc.deliveryFee ?? 0)}
-              </AppText>
-              <AppText variant="body" style={styles.streetLine} numberOfLines={1}>
-                {pickedLoc?.address}
-              </AppText>
-            </View>
-            <AppText variant="subtitle" tone="primary" style={{ fontWeight: "900" }}>
-              تغيير
-            </AppText>
-          </Pressable>
-        ) : null}
-
-        {!pickedLoc && addresses?.map((a) => {
-          // Saved addresses are only active while no map spot is pinned.
-          const selected = !pickedLoc && a._id === address?._id;
-          return (
+        <View style={styles.fulfillment}>
+          <AppText variant="subtitle">طريقة الاستلام</AppText>
+          {FULFILLMENT_METHODS.map((f) => (
             <Pressable
-              key={a._id}
+              key={f.value}
               accessibilityRole="radio"
-              accessibilityState={{ selected, disabled: !a.zoneActive }}
-              disabled={!a.zoneActive}
-              onPress={() => {
-                setPicked(null);
-                setChosenId(a._id);
-              }}
-              style={[styles.option, styles.addressOption, selected && styles.optionOn]}>
-              <View style={[styles.radio, selected && styles.radioOn]} />
-            <View style={styles.optionBody}>
-              <AppText variant="caption" tone={a.zoneActive ? "primary" : "danger"} style={styles.zoneTop}>
-                📍 {a.zoneName} · {a.zoneActive ? formatPrice(a.deliveryFee) : "التوصيل متوقف هنا"}
-              </AppText>
-              {a.street ? (
-                <AppText variant="body" style={styles.streetLine} numberOfLines={1}>
-                  {a.street}
+              accessibilityState={{ selected: fulfillment === f.value }}
+              onPress={() => setFulfillment(f.value)}
+              style={[styles.fulfillmentOption, fulfillment === f.value && styles.fulfillmentOptionOn]}>
+              <View style={[styles.radio, fulfillment === f.value && styles.radioOn]} />
+              <View style={styles.fulfillmentOptionBody}>
+                <AppText variant="subtitle">{f.label}</AppText>
+                <AppText variant="caption" tone="muted" numberOfLines={1}>
+                  {f.detail}
                 </AppText>
-              ) : null}
-            </View>
+              </View>
             </Pressable>
-          );
-        })}
+          ))}
+        </View>
+        {fulfillment === "delivery" && (
+          <>
+            <AppText variant="subtitle">التوصيل إلى</AppText>
 
-        {!pickedLoc ? (
-          <Button kind="secondary" label="اختر موقعك على الخريطة" onPress={openLocationPicker} style={styles.chooseLocationBtn} />
-        ) : null}
+            {/* A spot confirmed on the map. It wins over a saved address, and tapping
+                the card re-opens the map to change it. */}
+            {pickedLoc ? (
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ selected: true }}
+                accessibilityLabel="الموقع المحدد على الخريطة"
+                onPress={openLocationPicker}
+                style={[styles.option, styles.addressOption, styles.optionOn]}>
+                <View style={[styles.radio, styles.radioOn]} />
+                <View style={styles.optionBody}>
+                  <AppText variant="caption" tone="primary" style={styles.zoneTop}>
+                    📍 {pickedLoc?.zoneName} · {formatPrice(pickedLoc.deliveryFee ?? 0)}
+                  </AppText>
+                  <AppText variant="body" style={styles.streetLine} numberOfLines={1}>
+                    {pickedLoc?.address}
+                  </AppText>
+                </View>
+                <AppText variant="subtitle" tone="primary" style={{ fontWeight: "900" }}>
+                  تغيير
+                </AppText>
+              </Pressable>
+            ) : null}
+
+            {!pickedLoc && addresses?.map((a) => {
+              // Saved addresses are only active while no map spot is pinned.
+              const selected = !pickedLoc && a._id === address?._id;
+              return (
+                <Pressable
+                  key={a._id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected, disabled: !a.zoneActive }}
+                  disabled={!a.zoneActive}
+                  onPress={() => {
+                    setPicked(null);
+                    setChosenId(a._id);
+                  }}
+                  style={[styles.option, styles.addressOption, selected && styles.optionOn]}>
+                  <View style={[styles.radio, selected && styles.radioOn]} />
+              <View style={styles.optionBody}>
+                <AppText variant="caption" tone={a.zoneActive ? "primary" : "danger"} style={styles.zoneTop}>
+                  📍 {a.zoneName} · {a.zoneActive ? formatPrice(a.deliveryFee) : "التوصيل متوقف هنا"}
+                </AppText>
+                {a.street ? (
+                  <AppText variant="body" style={styles.streetLine} numberOfLines={1}>
+                    {a.street}
+                  </AppText>
+                ) : null}
+              </View>
+              </Pressable>
+              );
+            })}
+
+            {!pickedLoc ? (
+              <Button kind="secondary" label="اختر موقعك على الخريطة" onPress={openLocationPicker} style={styles.chooseLocationBtn} />
+            ) : null}
+          </>
+        )}
 
         {guest ? (
           <View style={styles.inputs}>
@@ -378,7 +415,7 @@ export default function Checkout() {
           multiline
         />
 
-        <PriceSummary subtotal={subtotal} deliveryFee={deliveryFee} />
+        <PriceSummary subtotal={subtotal} deliveryFee={deliveryFee} pickup={fulfillment === "pickup"} />
       </ScrollView>
     </FormScreen>
   );
@@ -388,6 +425,11 @@ const PAYMENT_METHODS: { value: "cod" | "vfcash" | "instapay"; label: string; de
   { value: "cod", label: "نقدًا عند الاستلام", detail: "ادفع للمندوب عند وصول الطلب." },
   { value: "vfcash", label: "( 010 908 627 40 ) VF Cash", detail: "الدفع عبر تطبيق VF Cash." },
   { value: "instapay", label: "( omar.mahmoud.26 ) InstaPay", detail: "الدفع عبر تطبيق InstaPay." },
+];
+
+const FULFILLMENT_METHODS: { value: "delivery" | "pickup"; label: string; detail: string }[] = [
+  { value: "delivery", label: "التوصيل", detail: "يوصل الطلب إلى باب منزلك." },
+  { value: "pickup", label: "استلام من الفرع", detail: "استلم طلبك بنفسك من أقرب فرع للمحل." },
 ];
 
 const styles = StyleSheet.create({
@@ -416,6 +458,19 @@ const styles = StyleSheet.create({
   },
   paymentOptionOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   paymentOptionBody: { gap: 1 },
+  fulfillment: { paddingTop: space.lg },
+  fulfillmentOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    padding: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  fulfillmentOptionOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  fulfillmentOptionBody: { gap: 1 },
   summaryHeader: {
     flexDirection: "row",
     alignItems: "center",

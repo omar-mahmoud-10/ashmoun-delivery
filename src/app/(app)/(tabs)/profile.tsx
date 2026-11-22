@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { Link, router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { AppText } from "@/components/app-text";
@@ -26,12 +26,11 @@ export default function Profile() {
 
   useEffect(() => {
     if (!pickedLoc?.zoneId || !pickedLoc.address) return;
-    // Wait for the session to resolve before saving; a logged-out user can't.
+    // Wait for the session to resolve before saving; a logged-out user can't
+    // create an address, but we keep the picked location in local storage so it
+    // survives logout and is still there when the user logs back in.
     if (me === undefined) return;
-    if (me === null) {
-      setPicked(null);
-      return;
-    }
+    if (me === null) return;
     void (async () => {
       setError(null);
       try {
@@ -79,6 +78,14 @@ export default function Profile() {
     router.push({ pathname: "/select-location", params: { from: "/profile" } });
   }
 
+  if (me === undefined) {
+    return (
+      <ScrollView contentContainerStyle={styles.screen}>
+        <ActivityIndicator style={styles.loading} color={colors.primary} />
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.screen}>
       {me === null ? (
@@ -96,8 +103,8 @@ export default function Profile() {
         </View>
       ) : (
         <View style={styles.card}>
-          <AppText variant="title">{me?.name}</AppText>
-          <AppText tone="muted">{me?.phone}</AppText>
+          <AppText variant="title">{me.name}</AppText>
+          <AppText tone="muted">{me.phone}</AppText>
         </View>
       )}
 
@@ -174,6 +181,7 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
+  loading: { marginTop: space.xxl },
   screen: { padding: space.lg, gap: space.md },
   card: {
     backgroundColor: colors.surface,

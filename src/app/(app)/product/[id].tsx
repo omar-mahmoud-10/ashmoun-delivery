@@ -1,6 +1,5 @@
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
-import { CartHeaderButton } from "@/components/cart-header-button";
 import { EmojiTile } from "@/components/emoji-tile";
 import { todayHoursLabel } from "@/components/shop-status";
 import { StepButton } from "@/components/step-button";
@@ -12,9 +11,9 @@ import { useCart } from "@/lib/cart";
 import { useNow } from "@/lib/use-now";
 import { colors, formatPrice, radius, space } from "@/theme";
 import { useQuery } from "convex/react";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type Selected = Record<string, string[]>;
@@ -54,6 +53,15 @@ export default function Product() {
 
   function addToCart() {
     if (priced.kind !== "ok") return;
+    if (!shopOpen) {
+      Alert.alert(
+        "المحل مغلق",
+        shop.paused
+          ? "المحل متوقف عن استقبال الطلبات مؤقتًا"
+          : "المحل مغلق حاليًا، لا يمكن إضافة أصناف إلى السلة",
+      );
+      return;
+    }
     useCart.getState().add(
       { id: shop._id, name: shop.name },
       {
@@ -72,7 +80,6 @@ export default function Product() {
 
   return (
     <SafeAreaView style={styles.screen} edges={Platform.OS === "web" ? [] : ["bottom"]}>
-      <Stack.Screen options={{ headerRight: () => <CartHeaderButton /> }} />
       <ScrollView contentContainerStyle={[styles.content, Platform.OS === "web" && styles.contentWeb]}>
         <View style={styles.header}>
           <EmojiTile emoji={product.emoji} tint={shop.tint} size={96} />
@@ -128,7 +135,7 @@ export default function Product() {
                 ? (() => {
                     const total = priced.unitPrice * quantity;
                     const totalStr = Number.isInteger(total) ? String(total) : total.toString();
-                    return `${narrow ? "أضف" : "أضف إلى السلة"} ( ${totalStr} ج )`;
+                    return `${narrow ? "أضف" : "أضف"} ( ${totalStr} ج )`;
                   })()
                 : "اختر المطلوب"
             }

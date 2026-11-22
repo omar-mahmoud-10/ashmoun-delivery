@@ -5,7 +5,7 @@ import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, useWindo
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { nextStatuses, statusLabels, type OrderStatus } from "@/convex/lib/orderStatus";
+import { getNextStatuses, statusLabels, type OrderStatus } from "@/convex/lib/orderStatus";
 import { ADMIN_MAX_WIDTH, adminPage } from "@/components/admin-grid";
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
@@ -45,7 +45,7 @@ export default function AdminOrder() {
   if (order === undefined) return <ActivityIndicator style={styles.loading} color={colors.primary} />;
   if (order === null) return <Unavailable message="هذا الطلب غير موجود" />;
 
-  const next = nextStatuses[order.status];
+  const next = getNextStatuses(order.status, order.fulfillment ?? "delivery");
   const activeDrivers = drivers?.filter((d) => d.active) ?? [];
   const selectedDriverId = activeDrivers.some((d) => d._id === driverId)
     ? driverId
@@ -154,22 +154,30 @@ export default function AdminOrder() {
                   }
                 />
               </View>
-              <AppText>
-                <AppText variant="subtitle">{order.address.zoneName}</AppText> — {order.address.label} ·{" "}
-                {order.address.street}
-                {order.address.landmark ? ` · ${order.address.landmark}` : ""}
-              </AppText>
-              {order.address.location ? (
-                <Button
-                  kind="secondary"
-                  label="📍 فتح الموقع على الخريطة"
-                  onPress={() =>
-                    void openUrl(
-                      `https://maps.google.com/?q=${order.address.location?.lat},${order.address.location?.lng}`,
-                      "تعذّر فتح الخريطة",
-                    )
-                  }
-                />
+              {order.fulfillment === "pickup" ? (
+                <AppText>
+                  <AppText variant="subtitle">🏪 استلام من الفرع</AppText> — {order.shopName}
+                </AppText>
+              ) : order.address ? (
+                <>
+                  <AppText>
+                    <AppText variant="subtitle">{order.address.zoneName}</AppText> — {order.address.label} ·{" "}
+                    {order.address.street}
+                    {order.address.landmark ? ` · ${order.address.landmark}` : ""}
+                  </AppText>
+                  {order.address.location ? (
+                    <Button
+                      kind="secondary"
+                      label="📍 فتح الموقع على الخريطة"
+                      onPress={() =>
+                        void openUrl(
+                          `https://maps.google.com/?q=${order.address?.location?.lat},${order.address?.location?.lng}`,
+                          "تعذّر فتح الخريطة",
+                        )
+                      }
+                    />
+                  ) : null}
+                </>
               ) : null}
               {order.driver ? (
                 <Pressable
@@ -238,7 +246,7 @@ export default function AdminOrder() {
                 </View>
               ))}
             </View>
-            <PriceSummary subtotal={order.subtotal} deliveryFee={order.deliveryFee} />
+            <PriceSummary subtotal={order.subtotal} deliveryFee={order.deliveryFee} pickup={order.fulfillment === "pickup"} />
           </View>
           <View style={wide ? styles.column : styles.stack}>
             {wide ? driverPicker : null}

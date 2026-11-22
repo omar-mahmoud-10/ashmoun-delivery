@@ -15,8 +15,6 @@ const MAX_COMMENT = 300;
 
 type Props = {
   shopId: string;
-  rating?: number;
-  reviewsCount?: number;
 };
 
 type ReviewItem = {
@@ -43,10 +41,19 @@ function Stars({ rating, size }: { rating?: number; size: number }) {
   );
 }
 
-export function ShopReviews({ shopId, rating, reviewsCount }: Props) {
+export function ShopReviews({ shopId }: Props) {
   const me = useQuery(api.users.me);
   const mine = useQuery(api.reviews.mine, { shopId });
   const reviews = useQuery(api.reviews.list, { shopId });
+
+  // The reviews list is the source of truth for what's shown. A shop's
+  // denormalized rating/reviewsCount can drift (e.g. a seeded rating with no
+  // matching review docs), so derive the summary from the live list instead of
+  // trusting those fields — this avoids advertising a rating with nothing to show.
+  const list = reviews ?? [];
+  const count = list.length;
+  const summaryRating =
+    count > 0 ? list.reduce((sum, r) => sum + r.rating, 0) / count : undefined;
 
   const [starRating, setStarRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -99,10 +106,10 @@ export function ShopReviews({ shopId, rating, reviewsCount }: Props) {
     <View style={styles.section}>
       <View style={styles.headingRow}>
         <AppText variant="title">التقييمات</AppText>
-        {reviewsCount && reviewsCount > 0 ? (
+        {count > 0 ? (
           <View style={styles.countPill}>
             <AppText variant="caption" tone="primaryInk">
-              {reviewsCount}
+              {count}
             </AppText>
           </View>
         ) : (
@@ -112,10 +119,10 @@ export function ShopReviews({ shopId, rating, reviewsCount }: Props) {
         )}
       </View>
 
-      {rating != null && reviewsCount && reviewsCount > 0 && (
+      {summaryRating != null && count > 0 && (
         <View style={styles.summary}>
-          <AppText variant="subtitle">{rating.toFixed(1)}</AppText>
-          <Stars rating={rating} size={16} />
+          <AppText variant="subtitle">{summaryRating.toFixed(1)}</AppText>
+          <Stars rating={summaryRating} size={16} />
         </View>
       )}
 
@@ -182,12 +189,12 @@ export function ShopReviews({ shopId, rating, reviewsCount }: Props) {
 
       {reviews === undefined ? (
         <ActivityIndicator style={styles.listLoading} color={colors.primary} />
-      ) : (reviews ?? []).length === 0 ? (
+      ) : count === 0 ? (
         <AppText variant="body" tone="muted" style={styles.empty}>
           لا توجد تقييمات بعد، كن أول من يقيّم هذا المحل
         </AppText>
       ) : (
-        (reviews ?? []).map((review: ReviewItem) => (
+        list.map((review: ReviewItem) => (
           <View key={review._id} style={styles.review}>
             <View style={styles.reviewHead}>
               <View style={styles.avatar}>

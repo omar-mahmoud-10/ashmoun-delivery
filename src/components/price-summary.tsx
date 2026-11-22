@@ -2,11 +2,22 @@ import { StyleSheet, View } from "react-native";
 import { colors, formatPrice, radius, space } from "@/theme";
 import { AppText } from "./app-text";
 
-export function PriceSummary({ subtotal, deliveryFee }: { subtotal: number | undefined; deliveryFee: number | undefined }) {
+export function PriceSummary({
+  subtotal,
+  deliveryFee,
+  pickup = false,
+}: {
+  subtotal: number | undefined;
+  deliveryFee: number | undefined;
+  pickup?: boolean;
+}) {
   const known = subtotal !== undefined && deliveryFee !== undefined;
   const items = [
     { label: "الطلب", value: subtotal === undefined ? "..." : formatPrice(subtotal) },
-    { label: "التوصيل", value: deliveryFee === undefined ? "..." : formatPrice(deliveryFee) },
+    {
+      label: pickup ? "الاستلام" : "التوصيل",
+      value: deliveryFee === undefined ? "..." : pickup ? "مجاني" : formatPrice(deliveryFee),
+    },
     { label: "الإجمالي", value: known ? formatPrice(subtotal + deliveryFee) : "...", strong: true },
   ];
 

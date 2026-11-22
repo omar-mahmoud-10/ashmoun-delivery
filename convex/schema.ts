@@ -142,13 +142,17 @@ export default defineSchema({
     userId: v.optional(v.id("users")),
     shopId: v.id("shops"),
     shopName: v.string(),
-    address: v.object({
-      zoneName: v.string(),
-      label: v.string(),
-      street: v.string(),
-      landmark: v.string(),
-      location: v.optional(geoPoint),
-    }),
+    // "delivery" (default for older orders) or "pickup" (handled at the branch).
+    fulfillment: v.optional(v.union(v.literal("delivery"), v.literal("pickup"))),
+    address: v.optional(
+      v.object({
+        zoneName: v.string(),
+        label: v.string(),
+        street: v.string(),
+        landmark: v.string(),
+        location: v.optional(geoPoint),
+      }),
+    ),
     customerName: v.string(),
     customerPhone: v.string(),
     items: v.array(

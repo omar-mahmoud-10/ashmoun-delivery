@@ -6,13 +6,20 @@ import { AppText } from "./app-text";
 
 const STORAGE_KEY = "@cart_tour_seen";
 
-// Approximate native header bar height where the cart button lives.
 const HEADER_TOP = 56;
-
-// Size of the slot that wraps the cart button (see cart-header-button.tsx).
 const SLOT_SIZE = 56;
 
-export function CartTour({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
+const FLOATING_TOP_OFFSET = 16;
+const FLOATING_LEFT_OFFSET = 20;
+const FLOATING_SIZE = 56;
+
+export type CartTourPosition = "header" | "floating";
+
+export function CartTour({
+  visible,
+  onDismiss,
+  position = "header",
+}: { visible: boolean; onDismiss: () => void; position?: CartTourPosition }) {
   const [dismissed, setDismissed] = useState<boolean | null>(null);
   const [pulse] = useState(() => new Animated.Value(1));
 
@@ -40,23 +47,36 @@ export function CartTour({ visible, onDismiss }: { visible: boolean; onDismiss: 
 
   if (!visible || dismissed) return null;
 
+  const isHeader = position === "header";
+  const highlightTop = isHeader ? HEADER_TOP : FLOATING_TOP_OFFSET;
+  const highlightLeft = isHeader ? space.sm : FLOATING_LEFT_OFFSET;
+  const cardTop = isHeader ? HEADER_TOP + SLOT_SIZE + space.sm * 3 : FLOATING_TOP_OFFSET + FLOATING_SIZE + space.sm * 2;
+  const cardLeft = isHeader ? space.lg : FLOATING_LEFT_OFFSET + FLOATING_SIZE / 2 - 150;
+  const arrowTop = isHeader ? HEADER_TOP + SLOT_SIZE + space.xs : FLOATING_TOP_OFFSET + FLOATING_SIZE + space.xs;
+  const arrowLeft = isHeader ? space.sm + SLOT_SIZE / 2 - 6 : FLOATING_LEFT_OFFSET + FLOATING_SIZE / 2 - 6;
+
   return (
     <View style={styles.overlay}>
-      {/* Spotlight ring around the cart icon (top-left in RTL). */}
+      <Animated.View
+        style={[
+          styles.highlightGlow,
+          { top: highlightTop - 10, left: highlightLeft - 10, transform: [{ scale: pulse }] },
+        ]}
+      />
       <Animated.View
         style={[
           styles.highlight,
-          { transform: [{ scale: pulse }], borderColor: colors.primary },
+          { top: highlightTop, left: highlightLeft, transform: [{ scale: pulse }], borderColor: colors.primary },
         ]}
       />
-      <View style={[styles.highlightFill, { backgroundColor: colors.primary }]} />
-      <View style={styles.arrow} />
-      <View style={styles.card}>
+      <View style={[styles.highlightFill, { top: highlightTop, left: highlightLeft, backgroundColor: colors.primary }]} />
+      <View style={[styles.arrow, { top: arrowTop, left: arrowLeft }]} />
+      <View style={[styles.card, { top: cardTop, left: cardLeft }]}>
         <AppText variant="subtitle" tone="ink" style={styles.title}>
           سلة مشترياتك
         </AppText>
         <AppText variant="caption" tone="muted" style={styles.body}>
-          كل صنف تضيفه يظهر هنا في السلة. اضغط عليها لمراجعة طلبك قبل الدفع.
+          هنا هتلاقي كل المنتجات اللي ضفتها للسلة
         </AppText>
         <Pressable style={styles.close} onPress={handleDismiss} accessibilityLabel="إغلاق الجولة">
           <AppText variant="subtitle" tone="onPrimary" style={styles.closeText}>
@@ -75,35 +95,39 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "flex-start",
     alignItems: "flex-start",
-    paddingTop: HEADER_TOP + space.xs,
     paddingHorizontal: space.lg,
     zIndex: 100,
   },
   highlight: {
     position: "absolute",
-    top: HEADER_TOP,
-    left: space.sm,
     width: SLOT_SIZE,
     height: SLOT_SIZE,
-    borderWidth: 2.5,
-    borderRadius: radius.pill + 4,
+    borderWidth: 4,
+    borderRadius: radius.pill + 8,
   },
   highlightFill: {
     position: "absolute",
-    top: HEADER_TOP,
-    left: space.sm,
     width: SLOT_SIZE,
     height: SLOT_SIZE,
-    borderRadius: radius.pill + 4,
-    opacity: 0.1,
+    borderRadius: radius.pill + 8,
+    opacity: 0.15,
+  },
+  highlightGlow: {
+    position: "absolute",
+    width: SLOT_SIZE + 20,
+    height: SLOT_SIZE + 20,
+    borderRadius: radius.pill + 18,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    opacity: 0.3,
+    top: -10,
+    left: -10,
   },
   arrow: {
     position: "absolute",
-    top: HEADER_TOP + SLOT_SIZE + space.xs,
-    left: space.sm + SLOT_SIZE / 2 - 6,
     width: 0,
     height: 0,
     backgroundColor: "transparent",
@@ -114,8 +138,6 @@ const styles = StyleSheet.create({
   },
   card: {
     position: "absolute",
-    top: HEADER_TOP + SLOT_SIZE + space.sm * 3,
-    left: space.lg,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: space.lg,

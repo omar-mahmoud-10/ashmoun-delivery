@@ -5,12 +5,11 @@ import { FlashOfferCard } from "@/components/flash-offer-card";
 import { OfferBanner } from "@/components/offer-banner";
 import { PromoCarousel } from "@/components/promo-carousel";
 import { api } from "@/convex/_generated/api";
-import { fonts, radius, space } from "@/theme";
 import { useResponsive } from "@/lib/responsive";
+import { fonts, radius, space } from "@/theme";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "convex/react";
 import { router } from "expo-router";
-import type { ComponentProps } from "react";
 import { useCallback, useEffect, useState } from "react";
 import {
   Animated,
@@ -23,38 +22,16 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
 const ORANGE = "#F26A1B";
-const DARK = "#48240C"; // decorative silhouettes on the header
-const LIME = "#E4F222";
-
-
-type HeaderShape = {
-  icon: ComponentProps<typeof Ionicons>["name"];
-  size: number;
-  top: number;
-  right?: number;
-  left?: number;
-  rotate: number;
-};
-
-// Decorative dark shapes scattered across the orange header — one per service line:
-// a sandwich with a drink, a grocery cart, and a flower.
-const HEADER_SHAPES: HeaderShape[] = [
-  { icon: "fast-food-outline", size: 90, top: -12, right: 24, rotate: 12 },
-  { icon: "cart-outline", size: 90, top: -6, right: 132, rotate: -10 },
-  { icon: "flower-outline", size: 90, top: -10, left: 44, rotate: -14 },
-];
-
-// Wave circles that bite into the bottom edge of the orange header.
-// const WAVE_COUNT = 9;
 
 const SEARCH_WORDS = ["طعام", "بقالة", "وجبات خفيفة", "المزيد"];
 
 export default function Home() {
-  const addresses = useQuery(api.addresses.mine);
   const categories = useQuery(api.catalog.categories);
+  const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
@@ -62,7 +39,6 @@ export default function Home() {
   const [placeholder, setPlaceholder] = useState(`ابحث عن ${SEARCH_WORDS[0]}`);
   const { width, isWebPhone } = useResponsive();
   const bannerWidth = Math.min(width, 480) - space.lg * 2 - 24;
-  const address = addresses?.find((a) => a.isDefault) ?? addresses?.[0];
 
   useEffect(() => {
     let wordIndex = 0;
@@ -155,31 +131,14 @@ export default function Home() {
           contentContainerStyle={[styles.list, Platform.OS === "web" && styles.listWeb]}
           showsVerticalScrollIndicator={false}
           scrollEnabled={!isWebPhone}>
-        {/* Full-bleed orange header with decorative shapes, search, and the wavy bottom edge */}
+        {/* Full-bleed orange header with search and the wavy bottom edge */}
         <View style={styles.orangeHeader}>
-          {HEADER_SHAPES.map((s) => (
-            <Ionicons
-              key={s.icon}
-              name={s.icon}
-              size={s.size}
-color={DARK}
-               style={{
-                 position: "absolute",
-                 top: s.top,
-                 opacity: 0.5,
-                transform: [{ rotate: `${s.rotate}deg` }],
-                ...(s.right != null ? { right: s.right } : { left: s.left }),
-              }}
-            />
-          ))}
-          <Pressable
-            style={[styles.locationRow, isWebPhone && styles.locationRowWebPhone]}
-            onPress={() => router.navigate({ pathname: "/select-location", params: { from: "/" } })}>
-              <AppText style={styles.locationLabel}>التوصيل إلى </AppText>
-              <AppText style={styles.locationArea}>{address ? address.zoneName : "اختر المنطقة"}</AppText>
-            <Ionicons name="chevron-down" size={16} color="#fff" />
-          </Pressable>
-          <View style={[styles.search, searchFocused && styles.searchFocused, isWebPhone && styles.searchWebPhone]}>
+          <View
+            style={[
+              styles.search,
+              searchFocused && styles.searchFocused,
+              isWebPhone ? styles.searchWebPhone : { marginTop: insets.top + space.sm },
+            ]}>
             <Ionicons name="search" size={20} color="#333" />
             <TextInput
               accessibilityLabel="ابحث عن الطعام"
@@ -193,11 +152,6 @@ color={DARK}
               onBlur={() => setSearchFocused(false)}
               style={[styles.searchInput, webNoOutline]}
             />
-          </View>
-          <View style={styles.blackFriday}>
-            <AppText style={styles.blackFridayText}>
-              <AppText style={styles.blackFridayWhite}>كل ما تريد</AppText> على التطبيق
-            </AppText>
           </View>
           {/* Wave separator: the header ends in a smooth white wave that leads into the page. */}
           <View pointerEvents="none" style={styles.svgWaveWrapper}>
@@ -378,15 +332,12 @@ const styles = StyleSheet.create({
   orangeHeader: {
     backgroundColor: ORANGE,
     // Room for the wave band so the content never sits inside it (kept tight on purpose).
-    paddingBottom: 18,
+    paddingTop: space.xl,
+    paddingBottom: 34,
     gap: space.md,
     paddingHorizontal: space.lg,
     overflow: "visible",
   },
-  locationRow: { flexDirection: "row", alignItems: "center", gap: space.xs, marginTop: 50, alignSelf: "flex-start" },
-  locationRowWebPhone: { marginTop: 20 },
-  locationLabel: { color: "#fff", fontWeight: "400", fontSize: 22, textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 },
-  locationArea: { color: "#fff", fontWeight: "900", fontSize: 22, textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 },
   search: {
     minHeight: 50,
     flexDirection: "row",
@@ -399,9 +350,6 @@ const styles = StyleSheet.create({
   searchWebPhone: { marginTop: space.md },
   searchFocused: { borderWidth: 2, borderColor: "#141414" },
   searchInput: { flex: 1, minHeight: 46, fontFamily: fonts.medium, fontSize: 15, color: "#000", textAlign: "right" },
-  blackFriday: { alignItems: "center", paddingVertical: space.sm },
-  blackFridayText: { color: LIME, fontWeight: "900", fontSize: 30, lineHeight: 44 },
-  blackFridayWhite: { color: "#fff", fontWeight: "900", fontSize: 30, lineHeight: 44 },
   svgWaveWrapper: {
     position: "absolute",
     bottom: -1,

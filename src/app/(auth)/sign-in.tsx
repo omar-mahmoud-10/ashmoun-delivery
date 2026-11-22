@@ -1,6 +1,7 @@
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useConvexAuth } from "convex/react";
 import { Link, router } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import { normalizePhone } from "@/convex/lib/phone";
 import { AppText } from "@/components/app-text";
@@ -13,10 +14,16 @@ import { space } from "@/theme";
 
 export default function Login() {
   const { signIn } = useAuthActions();
+  const { isAuthenticated } = useConvexAuth();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const authReadyRef = useRef(isAuthenticated);
+
+  useEffect(() => {
+    authReadyRef.current = isAuthenticated;
+  }, [isAuthenticated]);
 
   async function submit() {
     if (submitting) return;
@@ -26,7 +33,13 @@ export default function Login() {
     setSubmitting(true);
     try {
       await signIn("password", { flow: "signIn", phone: normalized, password });
-      // Signed in: land on the home tabs (checkout keeps its own gate).
+      // Wait for Convex to confirm the auth token with the server before
+      // navigating. Otherwise the `me` query on the profile page goes out
+      // unauthenticated and returns null, showing login buttons instead of
+      // account data.
+      while (!authReadyRef.current) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
       router.replace("/");
     } catch (e) {
       setError(errorMessage(e, "رقم الجوال أو كلمة المرور غير صحيحة"));

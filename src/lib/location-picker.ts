@@ -1,6 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
 import type { Id } from "@/convex/_generated/dataModel";
 
 export type PickedLocation = {
@@ -12,8 +10,6 @@ export type PickedLocation = {
   deliveryFee?: number;
   subtotal?: number;
   total?: number;
-  // When the pick was confirmed; the choice hub pops itself back to the
-  // caller only for picks made after it opened (ignores stale picks).
   at?: number;
 };
 
@@ -23,17 +19,12 @@ type State = {
   consume: () => PickedLocation | null;
 };
 
-export const useLocationPicker = create<State>()(
-  persist(
-    (set, get) => ({
-      picked: null,
-      setPicked: (loc) => set({ picked: loc }),
-      consume: () => {
-        const loc = get().picked;
-        if (loc) set({ picked: null });
-        return loc;
-      },
-    }),
-    { name: "location-picker", storage: createJSONStorage(() => AsyncStorage) },
-  ),
-);
+export const useLocationPicker = create<State>((set, get) => ({
+  picked: null,
+  setPicked: (loc) => set({ picked: loc }),
+  consume: () => {
+    const loc = get().picked;
+    if (loc) set({ picked: null });
+    return loc;
+  },
+}));

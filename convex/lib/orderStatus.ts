@@ -11,6 +11,8 @@ export const orderStatus = v.union(
 
 export type OrderStatus = Infer<typeof orderStatus>;
 
+export type Fulfillment = "delivery" | "pickup";
+
 export const nextStatuses: Record<OrderStatus, readonly OrderStatus[]> = {
   created: ["confirmed", "cancelled"],
   confirmed: ["with_driver", "cancelled"],
@@ -20,8 +22,23 @@ export const nextStatuses: Record<OrderStatus, readonly OrderStatus[]> = {
   cancelled: [],
 };
 
-export function canTransition(from: OrderStatus, to: OrderStatus) {
-  return nextStatuses[from].includes(to);
+// Pickup orders have no driver: the shop hands them over at the branch, so they
+// go straight from confirmed to handed over (delivered).
+const pickupNextStatuses: Record<OrderStatus, readonly OrderStatus[]> = {
+  created: ["confirmed", "cancelled"],
+  confirmed: ["delivered", "cancelled"],
+  with_driver: ["delivered", "returned"],
+  delivered: [],
+  returned: [],
+  cancelled: [],
+};
+
+export function getNextStatuses(status: OrderStatus, fulfillment: Fulfillment = "delivery") {
+  return (fulfillment === "pickup" ? pickupNextStatuses : nextStatuses)[status];
+}
+
+export function canTransition(from: OrderStatus, to: OrderStatus, fulfillment: Fulfillment = "delivery") {
+  return getNextStatuses(from, fulfillment).includes(to);
 }
 
 export function canCustomerCancel(status: OrderStatus) {

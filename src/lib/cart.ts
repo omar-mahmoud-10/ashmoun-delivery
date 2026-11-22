@@ -26,10 +26,13 @@ type CartShop = { id: Id<"shops">; name: string };
 
 type CartState = {
   lines: CartLine[];
+  showTour: boolean;
   add: (shop: CartShop, line: Omit<CartLine, "key" | "shopId" | "shopName">) => void;
   setQuantity: (key: string, quantity: number) => void;
   clear: () => void;
   clearShop: (shopId: Id<"shops">) => void;
+  dismissTour: () => void;
+  triggerTour: () => void;
 };
 
 function lineKey(productId: string, selections: CartSelection[]) {
@@ -40,21 +43,34 @@ function lineKey(productId: string, selections: CartSelection[]) {
   return `${productId}#${normalized}`;
 }
 
+const TOUR_STORAGE_KEY = "@cart_tour_seen";
+
 export const useCart = create<CartState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       lines: [],
+      showTour: false,
       add: (shop, line) =>
         set((state) => {
           const key = lineKey(line.productId, line.selections);
           const existing = state.lines.find((l) => l.key === key);
-          return {
-            lines: existing
-              ? state.lines.map((l) =>
-                  l.key === key ? { ...l, quantity: Math.min(MAX_QUANTITY, l.quantity + line.quantity) } : l,
-                )
-              : [...state.lines, { ...line, shopId: shop.id, shopName: shop.name, key }],
-          };
+          const wasEmpty = state.lines.length === 0;
+          const newLines = existing
+            ? state.lines.map((l) =>
+                l.key === key ? { ...l, quantity: Math.min(MAX_QUANTITY, l.quantity + line.quantity) } : l,
+              )
+            : [...state.lines, { ...line, shopId: shop.id, shopName: shop.name, key }];
+          
+          // Trigger tour if this is the first item added and tour hasn't been seen
+          if (wasEmpty && newLines.length > 0) {
+            AsyncStorage.getItem(TOUR_STORAGE_KEY).then((value) => {
+              if (value !== "1") {
+                set({ showTour: true });
+              }
+            });
+          }
+          
+          return { lines: newLines };
         }),
       setQuantity: (key, quantity) =>
         set((state) => ({
@@ -65,6 +81,20 @@ export const useCart = create<CartState>()(
         })),
       clear: () => set({ lines: [] }),
       clearShop: (shopId) => set((state) => ({ lines: state.lines.filter((l) => l.shopId !== shopId) })),
+      dismissTour: () => {
+        AsyncStorage.setItem(TOUR_STORAGE_KEY, "1");
+        set({ showTour: false });
+      },
+      resetTour: () => {
+        AsyncStorage.setItem(TOUR_STORAGE_KEY, "0");
+      },
+      triggerTour: () => {
+        AsyncStorage.getItem(TOUR_STORAGE_KEY).then((value) => {
+          if (value !== "1") {
+            set({ showTour: true });
+          }
+        });
+      },
     }),
     { name: "cart", storage: createJSONStorage(() => AsyncStorage) },
   ),

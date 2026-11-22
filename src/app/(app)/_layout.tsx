@@ -2,6 +2,7 @@ import { useQuery } from "convex/react";
 import { Stack } from "expo-router";
 import { api } from "@/convex/_generated/api";
 import { CartBar } from "@/components/cart-bar";
+import { CartTourProvider } from "@/components/cart-tour-provider";
 import { stackScreenOptions } from "@/theme";
 
 // Screens opened from a link still get the tabs underneath, so back always leads somewhere.
@@ -26,6 +27,7 @@ export default function AppLayout() {
         />
       </Stack>
       <CartBar />
+      <CartTourProvider />
     </>
   );
 }
