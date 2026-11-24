@@ -63,6 +63,7 @@ export function CartTour({
         <AppText variant="subtitle" tone="ink" style={styles.title}>
           سلة مشترياتك
         </AppText>
+        {/* //hello */}
         <AppText variant="caption" tone="muted" style={styles.body}>
           اضغط هنا عشان تلاقى كل المنتجات اللي ضفتها للسلة
         </AppText>
