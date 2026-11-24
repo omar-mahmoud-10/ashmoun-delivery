@@ -81,7 +81,7 @@ export function LocationMap({ center, onCenterChange, onReady }: Props) {
       if (cancelled || !hostRef.current || !window.L || mapRef.current) return;
       const L = window.L;
       const map = L.map(hostRef.current, { zoomControl: false, attributionControl: true });
-      map.setView([initLat.current, initLng.current], 16);
+      map.setView([initLat.current, initLng.current], 17);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap",

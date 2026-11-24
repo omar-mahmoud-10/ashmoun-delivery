@@ -46,7 +46,7 @@ export default function Orders() {
               <StatusPill status={item.status} />
             </View>
             <AppText variant="caption" tone="muted" numberOfLines={1}>
-              {item.items.map((i) => `${i.quantity}× ${i.name}`).join("، ")}
+              {item.items.map((i) => `${i.quantity} ${i.name}`).join("، ")}
             </AppText>
             <View style={styles.row}>
               <AppText variant="caption" tone="muted">

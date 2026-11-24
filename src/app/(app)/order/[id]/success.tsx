@@ -21,10 +21,7 @@ export default function OrderSuccess() {
       <View style={styles.badge}>
         <AppText style={styles.check}>✓</AppText>
       </View>
-      <AppText variant="display">سيتم تأكيد الأوردر خلال لحظات</AppText>
-      <AppText tone="muted" style={styles.center}>
-        {"تم استلام طلبك من " + (order?.shopName ?? "")}
-      </AppText>
+      <AppText variant="display" style={styles.center}>سيتم تأكيد الأوردر خلال لحظات</AppText>
       {order ? (
         <View style={styles.card}>
           <AppText variant="caption" tone="muted">
@@ -34,7 +31,13 @@ export default function OrderSuccess() {
             {formatPrice(order.total)}
           </AppText>
           <AppText variant="caption" tone="muted">
-            {order.fulfillment === "pickup" ? "الدفع نقدًا عند الاستلام من الفرع" : "ستدفع نقدًا عند الاستلام"}
+            {order.payment === "cod"
+              ? order.fulfillment === "pickup"
+                ? "الدفع نقدًا عند الاستلام من الفرع"
+                : "ستدفع نقدًا عند الاستلام"
+              : order.payment === "vfcash"
+              ? "الدفع عبر Vodafone Cash"
+              : "الدفع عبر InstaPay"}
           </AppText>
           <AppText variant="caption" tone="muted">
             {order.fulfillment === "pickup"

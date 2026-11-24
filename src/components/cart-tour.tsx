@@ -1,17 +1,11 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
-import { useCallback, useEffect, useState } from "react";
 import { colors, fonts, radius, space } from "@/theme";
+import { useCallback, useEffect, useState } from "react";
+import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "./app-text";
-
-const STORAGE_KEY = "@cart_tour_seen";
 
 const HEADER_TOP = 56;
 const SLOT_SIZE = 56;
-
-const FLOATING_TOP_OFFSET = 16;
-const FLOATING_LEFT_OFFSET = 20;
-const FLOATING_SIZE = 56;
 
 export type CartTourPosition = "header" | "floating";
 
@@ -20,15 +14,11 @@ export function CartTour({
   onDismiss,
   position = "header",
 }: { visible: boolean; onDismiss: () => void; position?: CartTourPosition }) {
-  const [dismissed, setDismissed] = useState<boolean | null>(null);
   const [pulse] = useState(() => new Animated.Value(1));
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((value) => setDismissed(value === "1"));
-  }, []);
-
-  useEffect(() => {
-    if (!visible || dismissed) return;
+    if (!visible) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1.18, duration: 700, useNativeDriver: Platform.OS !== "web" }),
@@ -37,23 +27,21 @@ export function CartTour({
     );
     loop.start();
     return () => loop.stop();
-  }, [visible, dismissed, pulse]);
+  }, [visible, pulse]);
 
   const handleDismiss = useCallback(async () => {
-    await AsyncStorage.setItem(STORAGE_KEY, "1");
-    setDismissed(true);
     onDismiss();
   }, [onDismiss]);
 
-  if (!visible || dismissed) return null;
+  if (!visible) return null;
 
   const isHeader = position === "header";
-  const highlightTop = isHeader ? HEADER_TOP : FLOATING_TOP_OFFSET;
-  const highlightLeft = isHeader ? space.sm : FLOATING_LEFT_OFFSET;
-  const cardTop = isHeader ? HEADER_TOP + SLOT_SIZE + space.sm * 3 : FLOATING_TOP_OFFSET + FLOATING_SIZE + space.sm * 2;
-  const cardLeft = isHeader ? space.lg : FLOATING_LEFT_OFFSET + FLOATING_SIZE / 2 - 150;
-  const arrowTop = isHeader ? HEADER_TOP + SLOT_SIZE + space.xs : FLOATING_TOP_OFFSET + FLOATING_SIZE + space.xs;
-  const arrowLeft = isHeader ? space.sm + SLOT_SIZE / 2 - 6 : FLOATING_LEFT_OFFSET + FLOATING_SIZE / 2 - 6;
+  const highlightTop = isHeader ? HEADER_TOP : insets.top + space.md;
+  const highlightLeft = isHeader ? space.sm : space.lg;
+  const cardTop = isHeader ? HEADER_TOP + SLOT_SIZE + space.sm * 3 : highlightTop + SLOT_SIZE + space.sm * 2;
+  const cardLeft = isHeader ? space.lg : space.lg;
+  const arrowTop = isHeader ? HEADER_TOP + SLOT_SIZE + space.xs : highlightTop + SLOT_SIZE + space.xs;
+  const arrowLeft = isHeader ? space.sm + SLOT_SIZE / 2 - 6 : space.lg + SLOT_SIZE / 2 - 6;
 
   return (
     <View style={styles.overlay}>
@@ -76,7 +64,7 @@ export function CartTour({
           سلة مشترياتك
         </AppText>
         <AppText variant="caption" tone="muted" style={styles.body}>
-          هنا هتلاقي كل المنتجات اللي ضفتها للسلة
+          اضغط هنا عشان تلاقى كل المنتجات اللي ضفتها للسلة
         </AppText>
         <Pressable style={styles.close} onPress={handleDismiss} accessibilityLabel="إغلاق الجولة">
           <AppText variant="subtitle" tone="onPrimary" style={styles.closeText}>

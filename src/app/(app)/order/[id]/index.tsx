@@ -1,21 +1,21 @@
-import { useMutation, useQuery } from "convex/react";
-import { Stack, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, View } from "react-native";
-import { api } from "@/convex/_generated/api";
-import { canCustomerCancel, type OrderStatus } from "@/convex/lib/orderStatus";
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
 import { OrderTimeline } from "@/components/order-status";
 import { PriceSummary } from "@/components/price-summary";
 import { Unavailable } from "@/components/unavailable";
+import { api } from "@/convex/_generated/api";
+import { canCustomerCancel, type OrderStatus } from "@/convex/lib/orderStatus";
 import { confirm } from "@/lib/confirm";
 import { errorMessage } from "@/lib/errors";
 import { orderCode } from "@/lib/order-code";
 import { colors, formatPrice, radius, space } from "@/theme";
+import { useMutation, useQuery } from "convex/react";
+import { Stack, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, View } from "react-native";
 
 const statusHints: Record<OrderStatus, { text: string; color: string }> = {
-  created: { text: "بانتظار تأكيد الطلب من المطعم", color: colors.warningInk },
+  created: { text: "بانتظار تأكيد الطلب", color: colors.warningInk },
   confirmed: { text: "يقوم المحل بتجهيز طلبك", color: colors.primaryInk },
   with_driver: { text: "المندوب في الطريق إليك", color: colors.primaryInk },
   delivered: { text: "تم التوصيل، بالهناء والشفاء", color: colors.successInk },
@@ -60,7 +60,6 @@ export default function OrderTracking() {
     <ScrollView contentContainerStyle={[styles.content, Platform.OS === "web" && styles.contentWeb]}>
       <Stack.Screen options={{ title: `طلب ${orderCode(order._id)}` }} />
       <View style={styles.card}>
-        <AppText variant="title" numberOfLines={2}>{order.shopName}</AppText>
         <AppText variant="subtitle" style={{ color: hint.color }}>
           {statusText}
         </AppText>
@@ -88,11 +87,12 @@ export default function OrderTracking() {
       ) : null}
 
       <View style={styles.card}>
+        <AppText variant="subtitle">{order.shopName}</AppText>
         {order.items.map((item, index) => (
           <View key={`${item.productId}-${index}`} style={styles.row}>
             <View style={styles.itemBody}>
               <AppText>
-                {item.quantity}× {item.name}
+                {item.quantity} {item.name}
               </AppText>
               {item.optionsLabel ? (
                 <AppText variant="caption" tone="muted">
@@ -128,7 +128,7 @@ export default function OrderTracking() {
         ) : (
           <>
             <AppText variant="caption" tone="muted">
-              التوصيل إلى {order.address?.label} · {order.address?.zoneName}
+              التوصيل إلى {order.address?.zoneName}
             </AppText>
             <AppText>
               {order.address?.street}
@@ -137,7 +137,13 @@ export default function OrderTracking() {
           </>
         )}
         <AppText variant="caption" tone="muted">
-          {isPickup ? "💵 الدفع نقدًا عند الاستلام من الفرع" : "💵 الدفع نقدًا عند الاستلام"}
+          {order.payment === "cod"
+            ? isPickup
+              ? "💵 الدفع نقدًا عند الاستلام من الفرع"
+              : "💵 الدفع نقدًا عند الاستلام"
+            : order.payment === "vfcash"
+            ? "💵 الدفع عبر Vodafone Cash"
+            : "💵 الدفع عبر InstaPay"}
         </AppText>
       </View>
 

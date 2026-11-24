@@ -1,15 +1,14 @@
 import { useMutation, useQuery } from "convex/react";
 import { Link, router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { AppText } from "@/components/app-text";
 import { Button } from "@/components/button";
 import { confirm } from "@/lib/confirm";
-import { useLocationPicker } from "@/lib/location-picker";
-import { useSignOut } from "@/lib/push";
 import { errorMessage } from "@/lib/errors";
+import { useSignOut } from "@/lib/push";
 import { colors, formatPrice, radius, space } from "@/theme";
 
 export default function Profile() {
@@ -17,39 +16,9 @@ export default function Profile() {
   const addresses = useQuery(api.addresses.mine);
   const setDefault = useMutation(api.addresses.setDefault);
   const remove = useMutation(api.addresses.remove);
-  const create = useMutation(api.addresses.create);
-  const pickedLoc = useLocationPicker((s) => s.picked);
-  const setPicked = useLocationPicker((s) => s.setPicked);
   const signOut = useSignOut();
   const [error, setError] = useState<string | null>(null);
   const sortedAddresses = [...(addresses ?? [])].sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
-
-  useEffect(() => {
-    if (!pickedLoc?.zoneId || !pickedLoc.address) return;
-    // Wait for the session to resolve before saving; a logged-out user can't
-    // create an address, but we keep the picked location in local storage so it
-    // survives logout and is still there when the user logs back in.
-    if (me === undefined) return;
-    if (me === null) return;
-    void (async () => {
-      setError(null);
-      try {
-        await create({
-          zoneId: pickedLoc.zoneId!,
-          label: "البيت",
-          street: pickedLoc.address!,
-          landmark: "",
-          location:
-            pickedLoc.lat !== undefined && pickedLoc.lng !== undefined
-              ? { lat: pickedLoc.lat, lng: pickedLoc.lng }
-              : undefined,
-        });
-        setPicked(null);
-      } catch (e) {
-        setError(errorMessage(e));
-      }
-    })();
-  }, [pickedLoc, me]);
 
   async function run(action: () => Promise<unknown>) {
     setError(null);

@@ -11,7 +11,7 @@ type Props = {
   onReady?: () => void;
 };
 
-const DEFAULT_DELTA = 0.008;
+const DEFAULT_DELTA = 0.004;
 
 export function LocationMap({ center, onCenterChange, onReady }: Props) {
   const mapRef = useRef<MapView>(null);

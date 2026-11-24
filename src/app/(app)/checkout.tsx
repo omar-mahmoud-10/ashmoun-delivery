@@ -51,8 +51,11 @@ export default function Checkout() {
   // the map confirms by writing the store and navigating back in the same tick, so
   // a focus-effect copy could run before the new value was rendered and drop it.
   const pickedLoc = useLocationPicker((s) => s.picked);
-  const setPicked = useLocationPicker((s) => s.setPicked);
   const deliverable = addresses?.filter((a) => a.zoneActive) ?? [];
+  const defaultAddress = deliverable.find((a) => a.isDefault) ?? deliverable[0];
+  useEffect(() => {
+    if (chosenId === null && defaultAddress) setChosenId(defaultAddress._id);
+  }, [defaultAddress?._id]);
   const address =
     deliverable.find((a) => a._id === chosenId) ?? deliverable.find((a) => a.isDefault) ?? deliverable[0];
   const guest = me === null;
@@ -61,7 +64,9 @@ export default function Checkout() {
   const shops = cartShops(lines);
 
   function openLocationPicker() {
-    router.push({ pathname: "/select-location", params: { from: "/checkout" } });
+    const defaultAddr = deliverable.find((a) => a.isDefault);
+    const addressIdToPass = chosenId ?? defaultAddr?._id;
+    router.push({ pathname: "/select-location", params: { from: "/checkout", addressId: addressIdToPass } });
   }
 
   const shopProblems = useMemo(() => {
@@ -103,13 +108,16 @@ export default function Checkout() {
     setPlacing(true);
     try {
       const pin = pickedLoc !== null;
+      // An explicitly chosen saved address wins over a map spot, and the map spot
+      // is never cleared by picking a saved address — it's preserved, not deleted.
+      const useMap = chosenId === null && pin;
       const res = await place({
         fulfillment,
-        addressId: fulfillment === "delivery" && !pin && !guest ? address?._id : undefined,
-        zoneId: fulfillment === "delivery" && (pin || guest) ? pickedLoc?.zoneId : undefined,
-        street: fulfillment === "delivery" && (pin || guest) ? (pickedLoc?.address ?? "") : undefined,
+        addressId: fulfillment === "delivery" && !useMap && !guest ? address?._id : undefined,
+        zoneId: fulfillment === "delivery" && useMap ? pickedLoc?.zoneId : undefined,
+        street: fulfillment === "delivery" && useMap ? (pickedLoc?.address ?? "") : undefined,
         location:
-          fulfillment === "delivery" && pin && pickedLoc?.lat !== undefined && pickedLoc?.lng !== undefined
+          fulfillment === "delivery" && useMap && pickedLoc?.lat !== undefined && pickedLoc?.lng !== undefined
             ? { lat: pickedLoc.lat, lng: pickedLoc.lng }
             : undefined,
         customerName: guest ? name.trim() : undefined,
@@ -139,9 +147,11 @@ export default function Checkout() {
   const destinationReady =
     fulfillment === "pickup"
       ? !guest || phone.trim().length >= 6
-      : pickedLoc
-        ? !!pickedLoc.zoneId && !!pickedLoc.address && (!guest || phone.trim().length >= 6)
-        : !guest && !!address;
+      : chosenId !== null
+        ? !!address && (!guest || phone.trim().length >= 6)
+        : pickedLoc
+          ? !!pickedLoc.zoneId && !!pickedLoc.address && (!guest || phone.trim().length >= 6)
+          : !guest && !!address;
   const deliveryFeePerOrder = pickedLoc ? pickedLoc.deliveryFee : address?.deliveryFee;
   const shopCount = shops.length;
   const deliveryFee =
@@ -240,7 +250,7 @@ export default function Checkout() {
                       <View key={l?.key ?? l?.name ?? String(Math.random())} style={styles.itemRow}>
                         <View style={styles.itemBody}>
                           <AppText variant="caption" numberOfLines={1}>
-                            {l?.quantity ?? 0}× {l?.name ?? ""}
+                            {l?.quantity ?? 0} {l?.name ?? ""}
                           </AppText>
                           {l?.optionsLabel ? (
                             <AppText variant="caption" tone="muted" numberOfLines={1}>
@@ -304,33 +314,27 @@ export default function Checkout() {
           <>
             <AppText variant="subtitle">التوصيل إلى</AppText>
 
-            {/* A spot confirmed on the map. It wins over a saved address, and tapping
-                the card re-opens the map to change it. */}
             {pickedLoc ? (
               <Pressable
                 accessibilityRole="radio"
-                accessibilityState={{ selected: true }}
+                accessibilityState={{ selected: chosenId === null }}
                 accessibilityLabel="الموقع المحدد على الخريطة"
-                onPress={openLocationPicker}
-                style={[styles.option, styles.addressOption, styles.optionOn]}>
-                <View style={[styles.radio, styles.radioOn]} />
+                onPress={() => (chosenId === null ? openLocationPicker() : setChosenId(null))}
+                style={[styles.option, styles.addressOption, chosenId === null && styles.optionOn]}>
+                <View style={[styles.radio, chosenId === null && styles.radioOn]} />
                 <View style={styles.optionBody}>
                   <AppText variant="caption" tone="primary" style={styles.zoneTop}>
-                    📍 {pickedLoc?.zoneName} · {formatPrice(pickedLoc.deliveryFee ?? 0)}
+                  {pickedLoc?.zoneName} · {formatPrice(pickedLoc.deliveryFee ?? 0)}
                   </AppText>
                   <AppText variant="body" style={styles.streetLine} numberOfLines={1}>
                     {pickedLoc?.address}
                   </AppText>
                 </View>
-                <AppText variant="subtitle" tone="primary" style={{ fontWeight: "900" }}>
-                  تغيير
-                </AppText>
               </Pressable>
             ) : null}
 
-            {!pickedLoc && addresses?.map((a) => {
-              // Saved addresses are only active while no map spot is pinned.
-              const selected = !pickedLoc && a._id === address?._id;
+            {addresses?.map((a) => {
+              const selected = a._id === chosenId;
               return (
                 <Pressable
                   key={a._id}
@@ -338,28 +342,25 @@ export default function Checkout() {
                   accessibilityState={{ selected, disabled: !a.zoneActive }}
                   disabled={!a.zoneActive}
                   onPress={() => {
-                    setPicked(null);
                     setChosenId(a._id);
                   }}
                   style={[styles.option, styles.addressOption, selected && styles.optionOn]}>
                   <View style={[styles.radio, selected && styles.radioOn]} />
-              <View style={styles.optionBody}>
-                <AppText variant="caption" tone={a.zoneActive ? "primary" : "danger"} style={styles.zoneTop}>
-                  📍 {a.zoneName} · {a.zoneActive ? formatPrice(a.deliveryFee) : "التوصيل متوقف هنا"}
-                </AppText>
-                {a.street ? (
-                  <AppText variant="body" style={styles.streetLine} numberOfLines={1}>
-                    {a.street}
-                  </AppText>
-                ) : null}
-              </View>
-              </Pressable>
+                  <View style={styles.optionBody}>
+                    <AppText variant="caption" tone={a.zoneActive ? "primary" : "danger"} style={styles.zoneTop}>
+                      📍 {a.zoneName} · {a.zoneActive ? formatPrice(a.deliveryFee) : "التوصيل متوقف هنا"}
+                    </AppText>
+                    {a.street ? (
+                      <AppText variant="body" style={styles.streetLine} numberOfLines={1}>
+                        {a.street}
+                      </AppText>
+                    ) : null}
+                  </View>
+                </Pressable>
               );
             })}
 
-            {!pickedLoc ? (
-              <Button kind="secondary" label="اختر موقعك على الخريطة" onPress={openLocationPicker} style={styles.chooseLocationBtn} />
-            ) : null}
+            <Button kind="secondary" label="اختر موقعك على الخريطة" onPress={openLocationPicker} style={styles.chooseLocationBtn} />
           </>
         )}
 

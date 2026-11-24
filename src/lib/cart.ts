@@ -61,13 +61,9 @@ export const useCart = create<CartState>()(
               )
             : [...state.lines, { ...line, shopId: shop.id, shopName: shop.name, key }];
           
-          // Trigger tour if this is the first item added and tour hasn't been seen
+          // Trigger tour whenever the cart goes from empty to non-empty
           if (wasEmpty && newLines.length > 0) {
-            AsyncStorage.getItem(TOUR_STORAGE_KEY).then((value) => {
-              if (value !== "1") {
-                set({ showTour: true });
-              }
-            });
+            set({ showTour: true });
           }
           
           return { lines: newLines };

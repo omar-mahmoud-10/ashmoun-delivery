@@ -20,8 +20,8 @@ import { colors, formatPrice, radius, space } from "@/theme";
 
 const actionLabels: Record<OrderStatus, string> = {
   created: "",
-  confirmed: "[subroutine]",
-  with_driver: "alm delivery",
+  confirmed: "تأكيد الطلب",
+  with_driver: "تسليم للمندوب",
   delivered: "تم التسليم",
   returned: "مرتجع",
   cancelled: "إلغاء الطلب",
@@ -143,9 +143,14 @@ export default function AdminOrder() {
                 <StatusPill status={order.status} />
               </View>
               <View style={styles.row}>
-                <AppText variant="subtitle" style={styles.flex}>
-                  {order.customerName}
-                </AppText>
+                <View style={styles.flex}>
+                  <AppText variant="subtitle">{order.customerName}</AppText>
+                  {order.customerPhone ? (
+                    <AppText variant="subtitle" tone="muted">
+                      📞 {order.customerPhone}
+                    </AppText>
+                  ) : null}
+                </View>
                 <Button
                   kind="secondary"
                   label="اتصال"
@@ -154,6 +159,13 @@ export default function AdminOrder() {
                   }
                 />
               </View>
+              {order.payment ? (
+                <View style={styles.row}>
+                  <AppText variant="caption" tone="muted">
+                    💳 {order.payment === "cod" ? "الدفع نقداً عند الاستلام" : order.payment === "vfcash" ? "VF Cash" : "InstaPay"}
+                  </AppText>
+                </View>
+              ) : null}
               {order.fulfillment === "pickup" ? (
                 <AppText>
                   <AppText variant="subtitle">🏪 استلام من الفرع</AppText> — {order.shopName}
@@ -201,40 +213,12 @@ export default function AdminOrder() {
             ) : null}
 
             <View style={styles.card}>
-              <AppText variant="subtitle">ملاحظة الأدمن للمحل</AppText>
-              <TextField
-                label="ملاحظة تُ relay للمحل"
-                placeholder="مثال: يرجى التأكيد عند التسليم"
-                multiline
-                value={adminNote}
-                onChangeText={setAdminNote}
-                maxLength={300}
-              />
-              <TextField
-                label="الوقت التقريبي"
-                placeholder="مثال: Within 30 minutes"
-                value={estimatedTime}
-                onChangeText={setEstimatedTime}
-                maxLength={50}
-              />
-              <Button
-                label="حفظ الملاحظة والوقت التقريبي"
-                loading={savingNote}
-                onPress={saveNote}
-              />
-              {order.adminNote || order.estimatedTime ? (
-                <AppText variant="caption" tone="muted">
-                  {order.estimatedTime ? `الوقت التقريبي: ${order.estimatedTime}` : ""}
-                </AppText>
-              ) : null}
-            </View>
-
-            <View style={styles.card}>
+              <AppText variant="subtitle">{order.shopName}</AppText>
               {order.items.map((item, index) => (
                 <View key={`${item.productId}-${index}`} style={styles.row}>
                   <View style={styles.flex}>
                     <AppText>
-                      {item.quantity}× {item.name}
+                      {item.quantity} {item.name}
                     </AppText>
                     {item.optionsLabel ? (
                       <AppText variant="caption" tone="muted">

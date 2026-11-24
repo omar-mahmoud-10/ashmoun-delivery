@@ -110,11 +110,11 @@ export default function SelectMap() {
           if (seq.current !== id) return;
           // Never block the pick on a failed lookup — fall back to a generic
           // label so the location is always saved and the customer can continue.
-          setPlaceLabel(label ?? `نقطة ${next.lat.toFixed(4)}, ${next.lng.toFixed(4)}`);
+          setPlaceLabel(label ?? `نقطة ${next.lat.toFixed(7)}, ${next.lng.toFixed(7)}`);
         })
         .catch(() => {
           if (seq.current !== id) return;
-          setPlaceLabel(`نقطة ${next.lat.toFixed(4)}, ${next.lng.toFixed(4)}`);
+          setPlaceLabel(`نقطة ${next.lat.toFixed(7)}, ${next.lng.toFixed(7)}`);
         })
         .finally(() => {
           if (seq.current === id) setGeocoding(false);
@@ -230,16 +230,16 @@ export default function SelectMap() {
     if (!silent) Keyboard.dismiss();
     setLocating(true);
     setSearchError(null);
-    try {
-      const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        if (!silent) setSearchError("اسمح بالوصول للموقع لتحديد مكانك");
-        return;
-      }
-      const { coords } = await ExpoLocation.getCurrentPositionAsync({
-        accuracy: ExpoLocation.Accuracy.Balanced,
-      });
-      pickMap({ lat: coords.latitude, lng: coords.longitude });
+try {
+        const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          if (!silent) setSearchError("اسمح بالوصول للموقع لتحديد مكانك");
+          return;
+        }
+        const { coords } = await ExpoLocation.getCurrentPositionAsync({
+          accuracy: ExpoLocation.Accuracy.High,
+        });
+        pickMap({ lat: coords.latitude, lng: coords.longitude });
     } catch {
       if (!silent) setSearchError("تعذر تحديد موقعك الحالي");
     } finally {
