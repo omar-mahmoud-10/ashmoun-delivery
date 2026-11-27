@@ -31,6 +31,7 @@ const SEARCH_WORDS = ["طعام", "بقالة", "وجبات خفيفة", "الم
 
 export default function Home() {
   const categories = useQuery(api.catalog.categories);
+  const addresses = useQuery(api.addresses.mine);
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -39,6 +40,10 @@ export default function Home() {
   const [placeholder, setPlaceholder] = useState(`ابحث عن ${SEARCH_WORDS[0]}`);
   const { width, isWebPhone } = useResponsive();
   const bannerWidth = Math.min(width, 480) - space.lg * 2 - 24;
+
+  // Get the default address or first address
+  const defaultAddress = addresses?.find((a) => a.isDefault) ?? addresses?.[0];
+  const hasSavedLocation = !!defaultAddress;
 
   useEffect(() => {
     let wordIndex = 0;
@@ -130,9 +135,28 @@ export default function Home() {
         <ScrollView
           contentContainerStyle={[styles.list, Platform.OS === "web" && styles.listWeb]}
           showsVerticalScrollIndicator={false}
-          scrollEnabled={!isWebPhone}>
+          scrollEnabled={true}>
         {/* Full-bleed orange header with search and the wavy bottom edge */}
         <View style={styles.orangeHeader}>
+          {/* Delivery location */}
+          <Pressable
+            style={styles.deliveryLocation}
+            accessibilityRole="button"
+            accessibilityLabel="تغيير موقع التوصيل"
+            onPress={() => router.push({ pathname: "/select-location", params: { from: "/" } })}>
+            {!hasSavedLocation && <AppText style={styles.deliveryLocationLabel}>التوصيل إلى</AppText>}
+            <AppText
+              style={[
+                styles.deliveryLocationValue,
+                hasSavedLocation ? styles.deliveryLocationSaved : styles.deliveryLocationEmpty,
+              ]}
+              numberOfLines={1}>
+              {hasSavedLocation
+                ? `${defaultAddress.zoneName}${defaultAddress.street ? `، ${defaultAddress.street}` : ""}${defaultAddress.landmark ? `، ${defaultAddress.landmark}` : ""}`
+                : "حدد موقعك"}
+            </AppText>
+            <Ionicons name="chevron-down" size={20} color="#fff" />
+          </Pressable>
           <View
             style={[
               styles.search,
@@ -172,23 +196,40 @@ export default function Home() {
 
         {/* Order sections — every category in the DB, read right-to-left in its stored order. */}
         {sections.length > 0 ? (
-          <View style={styles.quickLinks}>
-            {sections.map((c) => (
+          <>
+            <View style={styles.sectionsHeader}>
               <Pressable
-                key={c._id}
                 accessibilityRole="button"
-                accessibilityLabel={c.name}
-                style={styles.quickLink}
-                onPress={() => router.push({ pathname: "/category/[slug]", params: { slug: c.slug ?? c._id } })}>
-                <View style={styles.quickLinkTile}>
-                  <CategoryArt name={c.name} emoji={c.emoji} size={40} />
-                  <AppText style={styles.quickLinkLabel} numberOfLines={1}>
-                    {c.name}
-                  </AppText>
-                </View>
+                accessibilityLabel="عرض كل الأقسام"
+                style={styles.showAllButton}
+                onPress={() => router.navigate("/categories")}>
+                <AppText style={styles.showAllText}>عرض الكل</AppText>
+                <Ionicons name="chevron-back" size={16} color={ORANGE} />
               </Pressable>
-            ))}
+            </View>
+            <View style={styles.quickLinks}>
+            {sections.map((c, index) => {
+              const isBig = index < 2;
+              return (
+                <Pressable
+                  key={c._id}
+                  accessibilityRole="button"
+                  accessibilityLabel={c.name}
+                  style={[styles.quickLink, isBig ? styles.quickLinkBig : styles.quickLinkSmall]}
+                  onPress={() => router.push({ pathname: "/category/[slug]", params: { slug: c.slug ?? c._id } })}>
+                  <View style={[styles.quickLinkTile, isBig && styles.quickLinkTileBig, { backgroundColor: c.tint }]}>
+                    <AppText style={[styles.quickLinkLabel, isBig && styles.quickLinkLabelBig]} numberOfLines={1}>
+                      {c.name}
+                    </AppText>
+                    <View style={[styles.quickLinkArt, isBig && styles.quickLinkArtBig]}>
+                      <CategoryArt name={c.name} emoji={c.emoji} size={isBig ? 92 : 52} />
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            })}
           </View>
+          </>
         ) : null}
 
         {/* Promo banners: one card at a time, each sliding off to the right as the next arrives. */}
@@ -333,7 +374,7 @@ const styles = StyleSheet.create({
     backgroundColor: ORANGE,
     // Room for the wave band so the content never sits inside it (kept tight on purpose).
     paddingTop: space.xl,
-    paddingBottom: 34,
+    paddingBottom: 22,
     gap: space.md,
     paddingHorizontal: space.lg,
     overflow: "visible",
@@ -350,12 +391,38 @@ const styles = StyleSheet.create({
   searchWebPhone: { marginTop: space.md },
   searchFocused: { borderWidth: 2, borderColor: "#141414" },
   searchInput: { flex: 1, minHeight: 46, fontFamily: fonts.medium, fontSize: 15, color: "#000", textAlign: "right" },
+  // Delivery location above search
+  deliveryLocation: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    marginBottom: space.xs,
+  },
+  deliveryLocationLabel: {
+    color: "#fff",
+    fontFamily: fonts.bold,
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  deliveryLocationValue: {
+    color: "#fff",
+    fontFamily: fonts.bold,
+    fontSize: 20,
+    lineHeight: 28,
+    flexShrink: 1,
+  },
+  deliveryLocationSaved: {
+    opacity: 1,
+  },
+  deliveryLocationEmpty: {
+    opacity: 0.8,
+  },
   svgWaveWrapper: {
     position: "absolute",
     bottom: -1,
     left: 0,
     right: 0,
-    height: 26,
+    height: 16,
   },
   svgWave: {
     width: "100%",
@@ -363,6 +430,23 @@ const styles = StyleSheet.create({
   },
   // Order sections — quick category shortcuts above the offers.
   // The app is RTL (dir="rtl" / forcesRTL), so a plain "row" already starts at the right edge.
+  sectionsHeader: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: space.md,
+    marginBottom: space.xs,
+    paddingHorizontal: space.lg,
+  },
+  showAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  showAllText: {
+    color: ORANGE,
+    fontWeight: "800",
+    fontSize: 14,
+  },
   quickLinks: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -372,16 +456,18 @@ const styles = StyleSheet.create({
     marginBottom: space.xs,
     paddingHorizontal: space.lg,
   },
-  // Four fixed columns: nothing is wider than the screen, so no sideways scrolling.
-  quickLink: { width: "25%", alignItems: "center", paddingHorizontal: 4 },
+  // First two tiles span two columns (big); the rest sit three per row.
+  quickLink: { alignItems: "center", paddingHorizontal: 4 },
+  quickLinkBig: { width: "50%" },
+  quickLinkSmall: { width: "33.333%" },
   quickLinkTile: {
     width: "100%",
-    maxWidth: 84,
+    maxWidth: "100%",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingTop: 14,
+    paddingBottom: 12,
     paddingHorizontal: 4,
     borderRadius: radius.md,
     backgroundColor: "#F7F2EA",
@@ -391,13 +477,24 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
   },
+  quickLinkTileBig: {
+    maxWidth: "100%",
+    paddingTop: 18,
+    paddingBottom: 16,
+    gap: 10,
+  },
   quickLinkLabel: {
     color: "#48240C",
     fontWeight: "800",
-    fontSize: 11.5,
-    lineHeight: 15,
+    fontSize: 15,
+    lineHeight: 20,
     textAlign: "center",
   },
+  quickLinkLabelBig: { fontSize: 18, lineHeight: 24 },
+  // Scale the art up via transform so the tile (section) size stays the same.
+  // Only the first two (big) tiles also nudge their art left; the rest stay centered.
+  quickLinkArt: { alignItems: "center", transform: [{ scale: 1.3 }] },
+  quickLinkArtBig: { transform: [{ translateX: -18 }, { scale: 1.18 }] },
   // Banner carousel: the track is wider than a card so the neighbouring offers peek in at the edges.
   bannerWrap: { marginTop: space.sm, alignItems: "center" },
   banner: {

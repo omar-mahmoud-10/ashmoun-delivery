@@ -11,29 +11,31 @@ const HIDDEN_PATHS = ["/checkout", "/select-map"];
 // Order screens (just-placed success, tracking) must not have a floating cart over them,
 // so the cart is out of the way the moment an order is confirmed.
 const HIDDEN_PREFIXES = ["/order/"];
-// The native animated module does not exist on web, where the JS driver is used instead.
-const USE_NATIVE_DRIVER = Platform.OS !== "web";
 
 export function CartBar() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const lines = useCart((s) => s.lines);
+  const showTour = useCart((s) => s.showTour);
   const [pulse] = useState(() => new Animated.Value(1));
 
+  // While the tour is showing, the cart icon extends then returns to its usual
+  // size in sync with the highlight ring, drawing the eye to the cart.
   useEffect(() => {
-    const isHidden =
-      HIDDEN_PATHS.includes(pathname) ||
-      HIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-    if (lines.length === 0 || isHidden) return;
+    if (!showTour) {
+      pulse.setValue(1);
+      return;
+    }
+    const useNativeDriver = Platform.OS !== "web";
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.12, duration: 450, useNativeDriver: USE_NATIVE_DRIVER }),
-        Animated.timing(pulse, { toValue: 1, duration: 450, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.timing(pulse, { toValue: 1.18, duration: 700, useNativeDriver }),
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver }),
       ]),
     );
     loop.start();
     return () => loop.stop();
-  }, [lines.length, pulse, pathname]);
+  }, [showTour, pulse]);
 
   if (
     lines.length === 0 ||
@@ -46,25 +48,25 @@ export function CartBar() {
   const subtotal = cartSubtotal(lines);
 
   return (
-    <Animated.View
-      style={[styles.wrap, { top: insets.top + space.md, transform: [{ scale: pulse }] }]}
-      pointerEvents="box-none">
-      <Pressable
-        style={styles.button}
-        accessibilityRole="button"
-        accessibilityLabel={`السلة، ${count} منتجات`}
-        onPress={() =>
-          router.push({
-            pathname: "/checkout",
-            params: { subtotal: String(subtotal), count: String(count) },
-          })
-        }>
-        <Ionicons name="cart-outline" size={30} color="#000" />
-        <View style={styles.badge}>
-          <AppText style={styles.badgeText}>{count}</AppText>
-        </View>
-      </Pressable>
-    </Animated.View>
+    <View style={[styles.wrap, { top: insets.top + space.md }]} pointerEvents="box-none">
+      <Animated.View style={{ transform: [{ scale: pulse }] }}>
+        <Pressable
+          style={styles.button}
+          accessibilityRole="button"
+          accessibilityLabel={`السلة، ${count} منتجات`}
+          onPress={() =>
+            router.push({
+              pathname: "/checkout",
+              params: { subtotal: String(subtotal), count: String(count) },
+            })
+          }>
+          <Ionicons name="cart-outline" size={30} color="#000" />
+          <View style={styles.badge}>
+            <AppText style={styles.badgeText}>{count}</AppText>
+          </View>
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 }
 

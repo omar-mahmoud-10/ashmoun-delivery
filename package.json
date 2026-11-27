@@ -46,6 +46,7 @@
   },
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
+    "@rolldown/binding-win32-x64-msvc": "1.2.16",
     "@types/node": "^26.6.6",
     "@types/react": "~19.3.0",
     "convex-test": "^0.0.66",

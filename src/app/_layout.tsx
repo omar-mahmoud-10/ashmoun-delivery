@@ -15,7 +15,7 @@ import * as SecureStore from "expo-secure-store";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, type PropsWithChildren } from "react";
-import { Platform, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { colors, stackScreenOptions } from "@/theme";
 
 export { ErrorBoundary } from "expo-router";
@@ -30,8 +30,7 @@ if (Platform.OS === "web") {
 // The cloud deployment URL from .env.local is publicly reachable, so one value
 // serves every platform: web on localhost or LAN, native devices, and EAS builds.
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
-if (!convexUrl) throw new Error("EXPO_PUBLIC_CONVEX_URL is not set; run `pnpm exec convex dev`.");
-const convex = new ConvexReactClient(convexUrl, { unsavedChangesWarning: false });
+const convex = convexUrl ? new ConvexReactClient(convexUrl, { unsavedChangesWarning: false }) : null;
 
 const secureStorage = {
   getItem: SecureStore.getItemAsync,
@@ -56,6 +55,16 @@ export default function RootLayout() {
   }, [fontsReady]);
 
   if (!fontsReady) return null;
+
+  if (!convex) {
+    return (
+      <View style={styles.root}>
+        <Text style={styles.missingConvex}>
+          Convex is not configured. Set EXPO_PUBLIC_CONVEX_URL in .env.local, then run `pnpm exec convex dev`.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ConvexAuthProvider client={convex} storage={Platform.OS === "web" ? undefined : secureStorage}>
@@ -97,4 +106,9 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   backdrop: { backgroundColor: colors.border, alignItems: "center" },
   column: { width: "100%", maxWidth: PHONE_WIDTH },
+  missingConvex: {
+    padding: 16,
+    color: colors.ink,
+    textAlign: "center",
+  },
 });

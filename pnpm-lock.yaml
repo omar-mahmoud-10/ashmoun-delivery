@@ -74,7 +74,7 @@ importers:
         version: 58.1.8(expo@58.0.23)(react-native@0.88.1(@babel/core@7.29.13)(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       expo-router:
         specifier: ~58.0.30
-        version: 58.0.30(d4fa7fedf8cc815199f8678f5cf6f63d)
+        version: 58.0.30(3rlqzqk7yb6ktvf72zqjnqpi2m)
       expo-secure-store:
         specifier: ~58.0.2
         version: 58.0.2(expo@58.0.23)
@@ -136,6 +136,9 @@ importers:
       '@edge-runtime/vm':
         specifier: ^5.0.0
         version: 5.0.0
+      '@rolldown/binding-win32-x64-msvc':
+        specifier: 1.2.16
+        version: 1.2.16
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
@@ -5265,7 +5268,7 @@ snapshots:
       wrap-ansi: 7.0.0
       ws: 8.22.1
     optionalDependencies:
-      expo-router: 58.0.30(d4fa7fedf8cc815199f8678f5cf6f63d)
+      expo-router: 58.0.30(3rlqzqk7yb6ktvf72zqjnqpi2m)
       react-native: 0.88.1(@babel/core@7.29.13)(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0)
     transitivePeerDependencies:
       - '@expo/dom-webview'
@@ -5564,7 +5567,7 @@ snapshots:
       react: 19.3.0
     optionalDependencies:
       '@expo/metro-runtime': 58.0.17(@expo/log-box@58.0.15)(expo@58.0.23)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.13)(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
-      expo-router: 58.0.30(d4fa7fedf8cc815199f8678f5cf6f63d)
+      expo-router: 58.0.30(3rlqzqk7yb6ktvf72zqjnqpi2m)
       react-dom: 19.3.0(react@19.3.0)
     transitivePeerDependencies:
       - supports-color
@@ -6027,8 +6030,7 @@ snapshots:
   '@rolldown/binding-win32-arm64-msvc@1.2.16':
     optional: true
 
-  '@rolldown/binding-win32-x64-msvc@1.2.16':
-    optional: true
+  '@rolldown/binding-win32-x64-msvc@1.2.16': {}
 
   '@rolldown/pluginutils@1.0.1': {}
 
@@ -7308,7 +7310,7 @@ snapshots:
       - supports-color
       - typescript
 
-  expo-router@58.0.30(d4fa7fedf8cc815199f8678f5cf6f63d):
+  expo-router@58.0.30(3rlqzqk7yb6ktvf72zqjnqpi2m):
     dependencies:
       '@expo/log-box': 58.0.15(@expo/dom-webview@58.0.2)(expo@58.0.23)(react-native@0.88.1(@babel/core@7.29.13)(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       '@expo/metro-runtime': 58.0.17(@expo/log-box@58.0.15)(expo@58.0.23)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.13)(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)

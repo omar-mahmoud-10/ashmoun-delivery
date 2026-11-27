@@ -4,7 +4,7 @@
     "slug": "ashmoun-delivery",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo.jpg",
     "scheme": "ashmoundelivery",
     "userInterfaceStyle": "light",
     "ios": {

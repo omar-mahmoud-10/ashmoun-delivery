@@ -53,9 +53,13 @@ const categories = [
   { key: "pharmacies", name: "الصيدليات", emoji: "💊", tint: "#E6F4F1" },
   { key: "groceries", name: "البقالة", emoji: "🛍️", tint: "#E3EEFB" },
   { key: "flowers", name: "الورود", emoji: "💐", tint: "#FCE7F1" },
+  { key: "fruits", name: "الخضروات والفاكهة", emoji: "🥬", tint: "#E8F5E9" },
+  { key: "bakery", name: "المخبوزات", emoji: "🍞", tint: "#FDF2E1" },
+  { key: "sweets", name: "الحلويات", emoji: "🍰", tint: "#FCE8F1" },
+  { key: "cafe", name: "الكافيه", emoji: "☕", tint: "#EFE9E1" },
 ] as const;
 
-type CategoryKey = "مطاعم" | "pharmacies" | "groceries" | "flowers";
+type CategoryKey = "مطاعم" | "pharmacies" | "groceries" | "flowers" | "fruits" | "bakery" | "sweets" | "cafe";
 type OptionGroup = Infer<typeof optionGroup>;
 type SeedProduct = {
   name: string;
@@ -463,6 +467,10 @@ const CATEGORY_ALIASES: Record<string, string[]> = {
   الصيدليات: ["صيدليات", "صيدلية", "صيديليات"],
   البقالة: ["بقالة", "بقاليات"],
   الورود: ["زهور", "زهورات"],
+  "الخضروات والفاكهة": ["خضروات وفاكهة", "الفاكهة", "الخضروات", "فواكه", "خضروات"],
+  المخبوزات: ["مخبوزات", "مخبز"],
+  الحلويات: ["حلويات"],
+  الكافيه: ["كافيه", "قهوة"],
 };
 
 // One row per canonical category, with its fields synced and every alias (or exact-name

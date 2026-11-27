@@ -41,10 +41,9 @@ export default function Checkout() {
   const [error, setError] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const [hydrated, setHydrated] = useState(() => useCart.persist.hasHydrated());
   useEffect(() => {
     const unsub = useCart.persist.onFinishHydration(() => setHydrated(true));
-    if (useCart.persist.hasHydrated()) setHydrated(true);
     return () => { unsub(); };
   }, []);
   // Read the pick straight from the store instead of copying it into local state:
@@ -54,6 +53,7 @@ export default function Checkout() {
   const deliverable = addresses?.filter((a) => a.zoneActive) ?? [];
   const defaultAddress = deliverable.find((a) => a.isDefault) ?? deliverable[0];
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init when addresses load
     if (chosenId === null && defaultAddress) setChosenId(defaultAddress._id);
   }, [defaultAddress?._id]);
   const address =
